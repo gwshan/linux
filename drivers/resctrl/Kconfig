@@ -1,0 +1,11 @@
+# Confusingly, this is everything but the CPU bits of MPAM. CPU here means
+# CPU resources, not containers or cgroups etc.
+config ARM64_MPAM_DRIVER
+	bool "MPAM driver for System IP, e,g. caches and memory controllers"
+	depends on ARM64_MPAM && EXPERT
+
+config ARM64_MPAM_DRIVER_DEBUG
+	bool "Enable debug messages from the MPAM driver."
+	depends on ARM64_MPAM_DRIVER
+	help
+	  Say yes here to enable debug messages from the MPAM driver.
