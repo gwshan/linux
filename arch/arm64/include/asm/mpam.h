@@ -4,6 +4,7 @@
 #ifndef __ASM__MPAM_H
 #define __ASM__MPAM_H
 
+#include <linux/arm_mpam.h>
 #include <linux/bitops.h>
 #include <linux/bitfield.h>
 #include <linux/init.h>
