@@ -1,10 +1,14 @@
-# Confusingly, this is everything but the CPU bits of MPAM. CPU here means
-# CPU resources, not containers or cgroups etc.
+menu "ARM64 MPAM driver options"
+
 config ARM64_MPAM_DRIVER
 	bool "MPAM driver for System IP, e,g. caches and memory controllers"
-	depends on ARM64_MPAM && EXPERT
+	default y if ARM64_MPAM
+	select ACPI_MPAM if ACPI
 
-menu "ARM64 MPAM driver options"
+config ARM64_MPAM_RESCTRL_FS
+	bool
+	default y if ARM64_MPAM_DRIVER && RESCTRL_FS
+	select RESCTRL_RMID_DEPENDS_ON_CLOSID
 
 config ARM64_MPAM_DRIVER_DEBUG
 	bool "Enable debug messages from the MPAM driver."
