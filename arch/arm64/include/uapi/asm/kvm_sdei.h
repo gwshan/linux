@@ -16,6 +16,7 @@
 #define KVM_SDEI_MAX_VCPUS	512
 #define KVM_SDEI_INVALID_NUM	0
 #define KVM_SDEI_DEFAULT_NUM	0x40400000
+#define KVM_SDEI_ASYNC_PF_NUM	0x40400001
 
 struct kvm_sdei_event_state {
 	__u64	num;
