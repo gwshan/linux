@@ -313,11 +313,114 @@ done:
 	write_cache(vcpu, offsetof(struct kvm_vcpu_pv_apf_data, token), 0);
 }
 
+static void kvm_arch_async_sdei_notifier(struct kvm_vcpu *vcpu,
+					 unsigned long num,
+					 unsigned int state)
+{
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_arch_async_pf_control *apf = vcpu->arch.apf;
+
+	if (!apf)
+		return;
+
+	if (num != apf->sdei_event_num) {
+		kvm_err("%s: Invalid event number (%d-%d %lx-%llx)\n",
+			__func__, kvm->userspace_pid, vcpu->vcpu_idx,
+			num, apf->sdei_event_num);
+		return;
+	}
+
+	switch (state) {
+	case KVM_SDEI_NOTIFY_DELIVERED:
+		if (!apf->notpresent_pending)
+			break;
+
+		apf->notpresent_token = 0;
+		apf->notpresent_pending = false;
+		break;
+	case KVM_SDEI_NOTIFY_COMPLETED:
+		break;
+	default:
+		kvm_err("%s: Invalid state (%d-%d %lx-%d)\n",
+			__func__, kvm->userspace_pid, vcpu->vcpu_idx,
+			num, state);
+	}
+}
+
+static long kvm_arch_async_enable(struct kvm_vcpu *vcpu, u64 data)
+{
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_arch_async_pf_control *apf = vcpu->arch.apf;
+	gpa_t gpa = (data & ~0x3FUL);
+	bool enabled, enable;
+	int ret;
+
+	if (!apf || !irqchip_in_kernel(kvm))
+		return SMCCC_RET_NOT_SUPPORTED;
+
+	/* Bail if the state transition isn't allowed */
+	enabled = !!(apf->control_block & KVM_ASYNC_PF_ENABLED);
+	enable = !!(data & KVM_ASYNC_PF_ENABLED);
+	if (enable == enabled) {
+		kvm_debug("%s: Async PF has been %s on (%d-%d %llx-%llx)\n",
+			  __func__, enabled ? "enabled" : "disabled",
+			  kvm->userspace_pid, vcpu->vcpu_idx,
+			  apf->control_block, data);
+		return SMCCC_RET_NOT_REQUIRED;
+	}
+
+	/* To disable the functinality */
+	if (!enable) {
+		kvm_clear_async_pf_completion_queue(vcpu);
+		apf->control_block = data;
+		return SMCCC_RET_SUCCESS;
+	}
+
+	/*
+	 * The SDEI event and IRQ number should have been given
+	 * prior to enablement.
+	 */
+	if (!apf->sdei_event_num || !apf->irq) {
+		kvm_err("%s: Invalid SDEI event or IRQ (%d-%d %llx-%d)\n",
+			__func__, kvm->userspace_pid, vcpu->vcpu_idx,
+			apf->sdei_event_num, apf->irq);
+		return SMCCC_RET_INVALID_PARAMETER;
+	}
+
+	/* Register SDEI event notifier */
+	ret = kvm_sdei_register_notifier(kvm, apf->sdei_event_num,
+					 kvm_arch_async_sdei_notifier);
+	if (ret) {
+		kvm_err("%s: Error %d registering SDEI notifier (%d-%d %llx)\n",
+			__func__, ret, kvm->userspace_pid, vcpu->vcpu_idx,
+			apf->sdei_event_num);
+		return SMCCC_RET_NOT_SUPPORTED;
+	}
+
+	/* Initialize cache shared by host and guest */
+	ret = kvm_gfn_to_hva_cache_init(kvm, &apf->cache, gpa,
+			offsetofend(struct kvm_vcpu_pv_apf_data, token));
+	if (ret) {
+		kvm_err("%s: Error %d initializing cache (%d-%d)\n",
+			__func__, ret, kvm->userspace_pid, vcpu->vcpu_idx);
+		return SMCCC_RET_NOT_SUPPORTED;
+	}
+
+	/* Flush the token table */
+	kvm_async_pf_reset_slot(vcpu);
+	apf->send_user_only = !(data & KVM_ASYNC_PF_SEND_ALWAYS);
+	kvm_async_pf_wakeup_all(vcpu);
+	apf->control_block = data;
+
+	return SMCCC_RET_SUCCESS;
+}
+
 void kvm_arch_async_pf_hypercall(struct kvm_vcpu *vcpu, u64 *val)
 {
 	struct kvm *kvm = vcpu->kvm;
 	struct kvm_arch_async_pf_control *apf = vcpu->arch.apf;
 	u32 func;
+	u64 data;
 	long ret = SMCCC_RET_SUCCESS;
 
 	if (!apf) {
@@ -327,6 +430,22 @@ void kvm_arch_async_pf_hypercall(struct kvm_vcpu *vcpu, u64 *val)
 
 	func = smccc_get_arg1(vcpu);
 	switch (func) {
+	case ARM_SMCCC_KVM_FUNC_ASYNC_PF_VERSION:
+		val[1] = 0x010000; /* v1.0.0 */
+		break;
+	case ARM_SMCCC_KVM_FUNC_ASYNC_PF_SLOTS:
+		val[1] = ASYNC_PF_PER_VCPU;
+		break;
+	case ARM_SMCCC_KVM_FUNC_ASYNC_PF_SDEI:
+		val[1] = apf->sdei_event_num;
+		break;
+	case ARM_SMCCC_KVM_FUNC_ASYNC_PF_IRQ:
+		val[1] = apf->irq;
+		break;
+	case ARM_SMCCC_KVM_FUNC_ASYNC_PF_ENABLE:
+		data = (smccc_get_arg3(vcpu) << 32) | smccc_get_arg2(vcpu);
+		ret = kvm_arch_async_enable(vcpu, data);
+		break;
 	case ARM_SMCCC_KVM_FUNC_ASYNC_PF_IRQ_ACK:
 		if (!apf->pageready_pending)
 			break;
