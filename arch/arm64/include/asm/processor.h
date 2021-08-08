@@ -156,6 +156,7 @@ struct thread_struct {
 	u64			gcr_user_excl;
 #endif
 	u64			sctlr_user;
+	void			*data;
 };
 
 #define SCTLR_USER_MASK                                                        \
