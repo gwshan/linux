@@ -283,6 +283,31 @@ struct vcpu_reset_state {
 	bool		reset;
 };
 
+/* Should be a power of two number */
+#define ASYNC_PF_PER_VCPU	64
+
+/*
+ * The association of gfn and token. The token will be sent to guest as
+ * page fault address. Also, the guest could be in aarch32 mode. So its
+ * length should be 32-bits.
+ */
+struct kvm_arch_async_pf {
+	u32	token;
+	gfn_t	gfn;
+	u32	esr;
+};
+
+struct kvm_arch_async_pf_control {
+		struct gfn_to_hva_cache	cache;
+		u64			control_block;
+		bool			send_user_only;
+		u64			sdei_event_num;
+
+		u16			id;
+		bool			notpresent_pending;
+		u32			notpresent_token;
+};
+
 struct kvm_vcpu_arch {
 	struct kvm_cpu_context ctxt;
 	void *sve_state;
@@ -345,6 +370,9 @@ struct kvm_vcpu_arch {
 
 	/* SDEI support */
 	struct kvm_sdei_vcpu *sdei;
+
+	/* Asynchronous page fault support */
+	struct kvm_arch_async_pf_control *apf;
 
 	/*
 	 * Guest registers we preserve during guest debugging.
@@ -740,6 +768,30 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
 
 long kvm_vm_ioctl_mte_copy_tags(struct kvm *kvm,
 				struct kvm_arm_copy_mte_tags *copy_tags);
+
+#ifdef CONFIG_KVM_ASYNC_PF
+void kvm_arch_async_pf_create_vcpu(struct kvm_vcpu *vcpu);
+bool kvm_arch_async_not_present_allowed(struct kvm_vcpu *vcpu);
+bool kvm_arch_setup_async_pf(struct kvm_vcpu *vcpu,
+			     u32 esr, gpa_t gpa, gfn_t gfn);
+bool kvm_arch_async_page_not_present(struct kvm_vcpu *vcpu,
+				     struct kvm_async_pf *work);
+void kvm_arch_async_pf_destroy_vcpu(struct kvm_vcpu *vcpu);
+#else
+static inline void kvm_arch_async_pf_create_vcpu(struct kvm_vcpu *vcpu) { }
+static inline void kvm_arch_async_pf_destroy_vcpu(struct kvm_vcpu *vcpu) { }
+
+static inline bool kvm_arch_async_not_present_allowed(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+
+static inline bool kvm_arch_setup_async_pf(struct kvm_vcpu *vcpu,
+					   u32 esr, gpa_t gpa, gfn_t gfn)
+{
+	return false;
+}
+#endif
 
 /* Guest/host FPSIMD coordination helpers */
 int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu);

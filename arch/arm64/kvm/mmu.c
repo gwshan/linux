@@ -914,6 +914,33 @@ static inline bool is_write_fault(unsigned int esr)
 	return esr_dabt_is_wnr(esr);
 }
 
+static bool try_async_pf(struct kvm_vcpu *vcpu, unsigned int esr,
+			 gpa_t gpa, gfn_t gfn, kvm_pfn_t *pfn,
+			 bool write, bool *writable, bool prefault)
+{
+	struct kvm_arch_async_pf_control *apf = vcpu->arch.apf;
+	struct kvm_memory_slot *slot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
+	bool async = false;
+
+	if (apf) {
+		/* Bail if *pfn has correct page */
+		*pfn = __gfn_to_pfn_memslot(slot, gfn, false, &async,
+					    write, writable, NULL);
+		if (!async)
+			return false;
+
+		if (!prefault && kvm_arch_async_not_present_allowed(vcpu)) {
+			if (kvm_async_pf_find_slot(vcpu, gfn) ||
+			    kvm_arch_setup_async_pf(vcpu, esr, gpa, gfn))
+				return true;
+		}
+	}
+
+	*pfn = __gfn_to_pfn_memslot(slot, gfn, false, NULL,
+				    write, writable, NULL);
+	return false;
+}
+
 int kvm_handle_user_mem_abort(struct kvm_vcpu *vcpu,
 			      struct kvm_memory_slot *memslot,
 			      phys_addr_t fault_ipa,
@@ -1035,8 +1062,10 @@ int kvm_handle_user_mem_abort(struct kvm_vcpu *vcpu,
 	 */
 	smp_rmb();
 
-	pfn = __gfn_to_pfn_memslot(memslot, gfn, false, NULL,
-				   write_fault, &writable, NULL);
+	if (try_async_pf(vcpu, esr, fault_ipa, gfn, &pfn,
+			 write_fault, &writable, prefault))
+		return 1;
+
 	if (pfn == KVM_PFN_ERR_HWPOISON) {
 		kvm_send_hwpoison_signal(hva, vma_shift);
 		return 0;
