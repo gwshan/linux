@@ -7,6 +7,7 @@ ARM
 .. toctree::
    :maxdepth: 2
 
+   apf
    hyp-abi
    psci
    pvtime
