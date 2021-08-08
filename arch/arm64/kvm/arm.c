@@ -507,9 +507,23 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
  */
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 {
+	struct kvm_arch_async_pf_control *apf = v->arch.apf;
 	bool irq_lines = *vcpu_hcr(v) & (HCR_VI | HCR_VF);
-	return ((irq_lines || kvm_vgic_vcpu_pending_irq(v))
-		&& !v->arch.power_off && !v->arch.pause);
+
+	if ((irq_lines || kvm_vgic_vcpu_pending_irq(v)) &&
+	    !v->arch.power_off && !v->arch.pause)
+		return true;
+
+	if (apf && (apf->control_block & KVM_ASYNC_PF_ENABLED)) {
+		if (kvm_check_async_pf_completion_queue(v))
+			return true;
+
+		if (apf->notpresent_pending ||
+		    apf->pageready_pending)
+			return true;
+	}
+
+	return false;
 }
 
 bool kvm_arch_vcpu_in_kernel(struct kvm_vcpu *vcpu)
@@ -699,6 +713,9 @@ static void check_vcpu_requests(struct kvm_vcpu *vcpu)
 		if (kvm_check_request(KVM_REQ_VCPU_RESET, vcpu))
 			kvm_reset_vcpu(vcpu);
 
+		if (kvm_check_request(KVM_REQ_ASYNC_PF, vcpu))
+			kvm_check_async_pf_completion(vcpu);
+
 		if (kvm_check_request(KVM_REQ_SDEI, vcpu))
 			kvm_sdei_deliver(vcpu);
 
@@ -829,7 +846,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 		smp_store_mb(vcpu->mode, IN_GUEST_MODE);
 
 		if (ret <= 0 || need_new_vmid_gen(&vcpu->arch.hw_mmu->vmid) ||
-		    kvm_request_pending(vcpu)) {
+		    (kvm_request_pending(vcpu) &&
+		     READ_ONCE(vcpu->requests) != (1UL << KVM_REQ_ASYNC_PF))) {
 			vcpu->mode = OUTSIDE_GUEST_MODE;
 			isb(); /* Ensure work in x_flush_hwstate is committed */
 			kvm_pmu_sync_hwstate(vcpu);

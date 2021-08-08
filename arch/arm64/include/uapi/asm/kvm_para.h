@@ -9,6 +9,7 @@
 #define KVM_ASYNC_PF_SEND_ALWAYS	(1 << 1)
 
 #define KVM_PV_REASON_PAGE_NOT_PRESENT	1
+#define KVM_PV_REASON_PAGE_READY	2
 
 struct kvm_vcpu_pv_apf_data {
 	__u32	reason;

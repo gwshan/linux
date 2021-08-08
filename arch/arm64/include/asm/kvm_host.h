@@ -48,6 +48,7 @@
 #define KVM_REQ_RELOAD_GICv4	KVM_ARCH_REQ(4)
 #define KVM_REQ_RELOAD_PMU	KVM_ARCH_REQ(5)
 #define KVM_REQ_SDEI		KVM_ARCH_REQ(6)
+#define KVM_REQ_ASYNC_PF	KVM_ARCH_REQ(7)
 
 #define KVM_DIRTY_LOG_MANUAL_CAPS   (KVM_DIRTY_LOG_MANUAL_PROTECT_ENABLE | \
 				     KVM_DIRTY_LOG_INITIALLY_SET)
@@ -302,10 +303,12 @@ struct kvm_arch_async_pf_control {
 		u64			control_block;
 		bool			send_user_only;
 		u64			sdei_event_num;
+		u32			irq;
 
 		u16			id;
 		bool			notpresent_pending;
 		u32			notpresent_token;
+		bool			pageready_pending;
 };
 
 struct kvm_vcpu_arch {
@@ -776,6 +779,13 @@ bool kvm_arch_setup_async_pf(struct kvm_vcpu *vcpu,
 			     u32 esr, gpa_t gpa, gfn_t gfn);
 bool kvm_arch_async_page_not_present(struct kvm_vcpu *vcpu,
 				     struct kvm_async_pf *work);
+void kvm_arch_async_page_present_queued(struct kvm_vcpu *vcpu);
+bool kvm_arch_can_dequeue_async_page_present(struct kvm_vcpu *vcpu);
+void kvm_arch_async_page_ready(struct kvm_vcpu *vcpu,
+			       struct kvm_async_pf *work);
+void kvm_arch_async_page_present(struct kvm_vcpu *vcpu,
+				 struct kvm_async_pf *work);
+void kvm_arch_async_pf_hypercall(struct kvm_vcpu *vcpu, u64 *val);
 void kvm_arch_async_pf_destroy_vcpu(struct kvm_vcpu *vcpu);
 #else
 static inline void kvm_arch_async_pf_create_vcpu(struct kvm_vcpu *vcpu) { }
@@ -790,6 +800,11 @@ static inline bool kvm_arch_setup_async_pf(struct kvm_vcpu *vcpu,
 					   u32 esr, gpa_t gpa, gfn_t gfn)
 {
 	return false;
+}
+
+static inline void kvm_arch_async_pf_hypercall(struct kvm_vcpu *vcpu, u64 *val)
+{
+	val[0] = SMCCC_RET_NOT_SUPPORTED;
 }
 #endif
 
