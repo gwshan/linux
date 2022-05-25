@@ -136,6 +136,7 @@ static inline bool system_has_full_ptr_auth(void)
 
 #define kvm_vm_is_protected(_kvm) false
 #define vcpu_is_protected(_vcpu) false
+#define vcpu_is_rec(_vcpu) false
 
 #define vcpu_is_loaded(_vcpu) ((_vcpu)->cpu != -1)
 
