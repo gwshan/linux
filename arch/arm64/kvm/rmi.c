@@ -786,6 +786,31 @@ int realm_map_ipa(struct kvm *kvm, phys_addr_t ipa,
 	return realm_map_protected(kvm, ipa, pfn, map_size, memcache);
 }
 
+void kvm_destroy_rec(struct kvm_vcpu *vcpu)
+{
+	struct realm_rec *rec = &vcpu->arch.rec;
+
+	if (!vcpu_is_rec(vcpu))
+		return;
+
+	if (!rec->run) {
+		/* Nothing to do if the VCPU hasn't been finalized */
+		return;
+	}
+
+	if (WARN_ON(rmi_rec_destroy(rec->rec_phys, rec->sro)))
+		return;
+
+	free_page((unsigned long)rec->run);
+	kfree(rec->sro);
+	rmi_free_delegated_page(rec->rec_phys);
+	rec->run = NULL;
+	rec->sro = NULL;
+	rec->rec_page = NULL;
+	rec->rec_phys = 0;
+	rec->run_phys = 0;
+}
+
 void kvm_destroy_realm(struct kvm *kvm)
 {
 	struct realm *realm = &kvm->arch.realm;
