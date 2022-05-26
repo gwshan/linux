@@ -70,7 +70,9 @@ static inline void rmi_smccc_invoke(struct arm_smccc_1_2_regs *regs)
  */
 static __always_inline void rmi_smccc_invoke_once(struct arm_smccc_1_2_regs *regs)
 {
-	arm_smccc_1_2_smc(regs, regs);
+	struct arm_smccc_1_2_regs args = *regs;
+
+	arm_smccc_1_2_smc(&args, regs);
 }
 
 unsigned long rmi_feat_reg(unsigned int index);

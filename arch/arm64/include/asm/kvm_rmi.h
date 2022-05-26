@@ -114,6 +114,9 @@ int realm_map_ipa(struct kvm *kvm, phys_addr_t ipa,
 		  kvm_pfn_t pfn, unsigned long map_size,
 		  enum kvm_pgtable_prot prot,
 		  struct kvm_mmu_memory_cache *memcache);
+int kvm_rec_enter(struct kvm_vcpu *vcpu);
+int kvm_rec_exit(struct kvm_vcpu *vcpu, int rec_run_status);
+int kvm_rec_handle_request(struct kvm_vcpu *vcpu);
 
 static inline bool kvm_realm_is_private_address(struct realm *realm,
 						unsigned long addr)
