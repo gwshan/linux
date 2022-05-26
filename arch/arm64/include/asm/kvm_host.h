@@ -63,6 +63,7 @@
 #define KVM_REQ_MAP_L1_VNCR_EL2		KVM_ARCH_REQ(10)
 #define KVM_REQ_VGIC_PROCESS_UPDATE	KVM_ARCH_REQ(11)
 #define KVM_REQ_RELOAD_GICv5		KVM_ARCH_REQ(12)
+#define KVM_REQ_RMI			KVM_ARCH_REQ(13)
 
 /* Bit indices for kvm_arch::flags */
 enum {
