@@ -104,6 +104,20 @@ int kvm_rec_enter(struct kvm_vcpu *vcpu);
 int kvm_rec_exit(struct kvm_vcpu *vcpu, int rec_run_status);
 int kvm_rec_handle_request(struct kvm_vcpu *vcpu);
 
+enum kvm_gfn_range_filter;
+
+void kvm_realm_unmap_range_filter(struct kvm *kvm,
+				  unsigned long ipa,
+				  unsigned long size,
+				  bool may_block,
+				  enum kvm_gfn_range_filter attr_filter);
+
+void kvm_realm_unmap_range(struct kvm *kvm,
+			   unsigned long ipa,
+			   unsigned long size,
+			   bool unmap_private,
+			   bool may_block);
+
 static inline bool kvm_realm_is_private_address(struct realm *realm,
 						unsigned long addr)
 {
