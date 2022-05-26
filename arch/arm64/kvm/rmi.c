@@ -779,6 +779,26 @@ static void noinstr load_realm_timer_state(struct kvm_vcpu *vcpu)
 	write_sysreg_el0(rec_exit->cntp_ctl, SYS_CNTP_CTL);
 }
 
+static void noinstr rec_enter_sync(struct kvm_vcpu *vcpu)
+{
+	struct rec_run *run = vcpu->arch.rec.run;
+	struct rec_enter *entry = &run->enter;
+
+	if (vcpu_get_flag(vcpu, PENDING_EXCEPTION)) {
+		entry->flags |= REC_ENTER_FLAG_INJECT_SEA;
+		vcpu_clear_flag(vcpu, PENDING_EXCEPTION);
+		vcpu_clear_flag(vcpu, EXCEPT_MASK);
+	} else if (vcpu_get_flag(vcpu, INCREMENT_PC)) {
+		if (run->exit.exit_reason == RMI_EXIT_SYNC &&
+		    ESR_ELx_EC(run->exit.esr) == ESR_ELx_EC_DABT_LOW &&
+		    !kvm_vcpu_dabt_is_cm(vcpu)) {
+			entry->flags |= REC_ENTER_FLAG_EMULATED_MMIO;
+			entry->gprs[0] = vcpu_get_reg(vcpu, 0);
+		}
+		vcpu_clear_flag(vcpu, INCREMENT_PC);
+	}
+}
+
 static void noinstr rec_prepare_exit_state(struct kvm_vcpu *vcpu)
 {
 	struct realm_rec *rec = &vcpu->arch.rec;
@@ -810,6 +830,7 @@ int noinstr kvm_rec_enter(struct kvm_vcpu *vcpu)
 	struct realm_rec *rec = &vcpu->arch.rec;
 	int ret;
 
+	rec_enter_sync(vcpu);
 	local_daif_mask();
 	pmr_sync();
 

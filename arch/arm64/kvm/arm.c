@@ -1523,10 +1523,13 @@ out:
 	 * with pending exceptions or PC adjustment, commit these
 	 * adjustments in order to give userspace a consistent view of
 	 * the vcpu state. Note that this relies on __kvm_adjust_pc()
-	 * being preempt-safe on VHE.
+	 * being preempt-safe on VHE. A REC's protected state cannot be
+	 * adjusted by the host, so leave the flags for kvm_rec_enter() to
+	 * translate into the REC entry state.
 	 */
-	if (unlikely(vcpu_get_flag(vcpu, PENDING_EXCEPTION) ||
-		     vcpu_get_flag(vcpu, INCREMENT_PC)))
+	if (unlikely(!vcpu_is_rec(vcpu) &&
+		     (vcpu_get_flag(vcpu, PENDING_EXCEPTION) ||
+		      vcpu_get_flag(vcpu, INCREMENT_PC))))
 		kvm_call_hyp(__kvm_adjust_pc, vcpu);
 
 	vcpu_put(vcpu);

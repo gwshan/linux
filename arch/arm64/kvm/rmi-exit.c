@@ -21,6 +21,7 @@ static int rec_exit_fatal(struct kvm_vcpu *vcpu, const char *reason,
 
 static void rec_exit_sync(struct kvm_vcpu *vcpu)
 {
+	struct realm_rec *rec = &vcpu->arch.rec;
 	u64 esr = kvm_vcpu_get_esr(vcpu);
 	u8 ec = ESR_ELx_EC(esr);
 
@@ -29,6 +30,16 @@ static void rec_exit_sync(struct kvm_vcpu *vcpu)
 		if ((esr & ESR_ELx_SYS64_ISS_DIR_MASK) ==
 		    ESR_ELx_SYS64_ISS_DIR_READ)
 			kvm_make_request(KVM_REQ_RMI, vcpu);
+		break;
+	case ESR_ELx_EC_DABT_LOW:
+		/*
+		 * The RMM reports the value of an MMIO write in gprs[0],
+		 * irrespective of the register named by the instruction.
+		 */
+		if (kvm_vcpu_dabt_iswrite(vcpu) &&
+		    kvm_vcpu_dabt_isvalid(vcpu))
+			vcpu_set_reg(vcpu, kvm_vcpu_dabt_get_rd(vcpu),
+				     rec->run->exit.gprs[0]);
 		break;
 	}
 }
