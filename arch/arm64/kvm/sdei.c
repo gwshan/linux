@@ -85,6 +85,54 @@ static unsigned long event_context(struct kvm_vcpu *vcpu)
 	return ctxt->regs[param_id];
 }
 
+static void event_complete(struct kvm_vcpu *vcpu, bool resume)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_event_context *ctxt = &vsdei->ctxt;
+	unsigned long pstate, resume_addr = smccc_get_arg(vcpu, 1);
+	unsigned int num, i;
+
+	num = find_next_bit(&vsdei->running, KVM_NR_SDEI_EVENTS, 0);
+	if (num >= KVM_NR_SDEI_EVENTS)
+		return;
+
+	/* Restore registers: x0 -> x17 */
+	for (i = 0; i < ARRAY_SIZE(ctxt->regs); i++)
+		vcpu_set_reg(vcpu, i, ctxt->regs[i]);
+
+	/*
+	 * The registers are modified accordingly if the execution resumes
+	 * from the specified address.
+	 *
+	 * SPSR_EL1: PSTATE of the interrupted context
+	 * ELR_EL1:  PC of the interrupted context
+	 * PSTATE:   cleared nRW bit, but D/A/I/F bits are set
+	 * PC:       the resume address
+	 */
+	if (resume) {
+		if (has_vhe()) {
+			write_sysreg_el1(ctxt->pstate, SYS_SPSR);
+			write_sysreg_s(ctxt->pc, SYS_ELR_EL12);
+		} else {
+			__vcpu_sys_reg(vcpu, SPSR_EL1) = ctxt->pstate;
+			__vcpu_sys_reg(vcpu, ELR_EL1) = ctxt->pc;
+		}
+
+		pstate = ctxt->pstate;
+		pstate &= ~(PSR_MODE32_BIT | PSR_MODE_MASK);
+		pstate |= (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT |
+			   PSR_F_BIT | PSR_MODE_EL1h);
+		*vcpu_cpsr(vcpu) = pstate;
+		*vcpu_pc(vcpu) = resume_addr;
+	} else {
+		*vcpu_cpsr(vcpu) = ctxt->pstate;
+		*vcpu_pc(vcpu) = ctxt->pc;
+	}
+
+	/* Update event state */
+	clear_bit(num, &vsdei->running);
+}
+
 static unsigned long event_unregister(struct kvm_vcpu *vcpu)
 {
 	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
@@ -233,6 +281,12 @@ int kvm_sdei_call(struct kvm_vcpu *vcpu)
 		break;
 	case SDEI_1_0_FN_SDEI_EVENT_CONTEXT:
 		ret = event_context(vcpu);
+		break;
+	case SDEI_1_0_FN_SDEI_EVENT_COMPLETE:
+		event_complete(vcpu, false);
+		break;
+	case SDEI_1_0_FN_SDEI_EVENT_COMPLETE_AND_RESUME:
+		event_complete(vcpu, true);
 		break;
 	case SDEI_1_0_FN_SDEI_EVENT_UNREGISTER:
 		ret = event_unregister(vcpu);
