@@ -184,6 +184,26 @@ static unsigned long pe_mask(struct kvm_vcpu *vcpu, bool mask)
 	return SDEI_SUCCESS;
 }
 
+static unsigned long event_reset(struct kvm_vcpu *vcpu, bool private)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	unsigned int num;
+
+	/*
+	 * Nothing to do if we're going to reset the shared events,
+	 * which are unsupported.
+	 */
+	if (!private)
+		return SDEI_SUCCESS;
+
+	for (num = 0; num < KVM_NR_SDEI_EVENTS; num++) {
+		clear_bit(num, &vsdei->registered);
+		clear_bit(num, &vsdei->enabled);
+	}
+
+	return SDEI_SUCCESS;
+}
+
 int kvm_sdei_call(struct kvm_vcpu *vcpu)
 {
 	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
@@ -228,6 +248,12 @@ int kvm_sdei_call(struct kvm_vcpu *vcpu)
 		break;
 	case SDEI_1_0_FN_SDEI_PE_UNMASK:
 		ret = pe_mask(vcpu, false);
+		break;
+	case SDEI_1_0_FN_SDEI_PRIVATE_RESET:
+		ret = event_reset(vcpu, true);
+		break;
+	case SDEI_1_0_FN_SDEI_SHARED_RESET:
+		ret = event_reset(vcpu, false);
 		break;
 	default:
 		ret = SDEI_NOT_SUPPORTED;
