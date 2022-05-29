@@ -137,6 +137,38 @@ static unsigned long event_status(struct kvm_vcpu *vcpu)
 	return ret;
 }
 
+static unsigned long event_info(struct kvm_vcpu *vcpu)
+{
+	unsigned int num = smccc_get_arg(vcpu, 1);
+	unsigned int info = smccc_get_arg(vcpu, 2);
+	unsigned long ret = 0;
+
+	if (num >= KVM_NR_SDEI_EVENTS)
+		return SDEI_INVALID_PARAMETERS;
+
+	/*
+	 * All supported events are private and have normal priority.
+	 * Besides, all supported events can be signaled by software
+	 */
+	switch (info) {
+	case SDEI_EVENT_INFO_EV_TYPE:
+		ret = SDEI_EVENT_TYPE_PRIVATE;
+		break;
+	case SDEI_EVENT_INFO_EV_SIGNALED:
+		ret = 1;
+		break;
+	case SDEI_EVENT_INFO_EV_PRIORITY:
+		ret = SDEI_EVENT_PRIORITY_NORMAL;
+		break;
+	case SDEI_EVENT_INFO_EV_ROUTING_MODE:
+	case SDEI_EVENT_INFO_EV_ROUTING_AFF:
+	default:
+		ret = SDEI_INVALID_PARAMETERS;
+	}
+
+	return ret;
+}
+
 int kvm_sdei_call(struct kvm_vcpu *vcpu)
 {
 	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
@@ -172,6 +204,9 @@ int kvm_sdei_call(struct kvm_vcpu *vcpu)
 		break;
 	case SDEI_1_0_FN_SDEI_EVENT_STATUS:
 		ret = event_status(vcpu);
+		break;
+	case SDEI_1_0_FN_SDEI_EVENT_GET_INFO:
+		ret = event_info(vcpu);
 		break;
 	default:
 		ret = SDEI_NOT_SUPPORTED;
