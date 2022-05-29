@@ -85,6 +85,39 @@ static unsigned long event_context(struct kvm_vcpu *vcpu)
 	return ctxt->regs[param_id];
 }
 
+static unsigned long event_unregister(struct kvm_vcpu *vcpu)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	unsigned int num = smccc_get_arg(vcpu, 1);
+
+	if (num >= KVM_NR_SDEI_EVENTS)
+		return SDEI_INVALID_PARAMETERS;
+
+	/*
+	 * Reject if the event isn't registered. It's allowed to
+	 * unregister event which has been pending for that.
+	 */
+	if (!test_bit(num, &vsdei->registered)) {
+		if (test_bit(num, &vsdei->running))
+			return SDEI_PENDING;
+		else
+			return SDEI_DENIED;
+	}
+
+	/*
+	 * The event is disabled automatically on unregistration, even
+	 * pending for that.
+	 */
+	clear_bit(num, &vsdei->enabled);
+	clear_bit(num, &vsdei->registered);
+
+	/* Pending for unreigstration if the event handler is running */
+	if (test_bit(num, &vsdei->running))
+		return SDEI_PENDING;
+
+	return SDEI_SUCCESS;
+}
+
 int kvm_sdei_call(struct kvm_vcpu *vcpu)
 {
 	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
@@ -114,6 +147,9 @@ int kvm_sdei_call(struct kvm_vcpu *vcpu)
 		break;
 	case SDEI_1_0_FN_SDEI_EVENT_CONTEXT:
 		ret = event_context(vcpu);
+		break;
+	case SDEI_1_0_FN_SDEI_EVENT_UNREGISTER:
+		ret = event_unregister(vcpu);
 		break;
 	default:
 		ret = SDEI_NOT_SUPPORTED;
