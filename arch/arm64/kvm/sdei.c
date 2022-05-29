@@ -13,6 +13,34 @@
 #include <kvm/arm_hypercalls.h>
 #include <asm/kvm_sdei.h>
 
+static unsigned long event_register(struct kvm_vcpu *vcpu)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	unsigned int num = smccc_get_arg(vcpu, 1);
+	unsigned long flags = smccc_get_arg(vcpu, 4);
+
+	if (num >= KVM_NR_SDEI_EVENTS)
+		return SDEI_INVALID_PARAMETERS;
+
+	/* Reject if the reserved bits or relative mode are set */
+	if (flags & ~0x1UL)
+		return SDEI_INVALID_PARAMETERS;
+
+	/*
+	 * Reject if the event has been registered or pending for
+	 * unregistration.
+	 */
+	if (test_bit(num, &vsdei->registered) ||
+	    test_bit(num, &vsdei->running))
+		return SDEI_DENIED;
+
+	vsdei->handlers[num].ep_addr = smccc_get_arg(vcpu, 2);
+	vsdei->handlers[num].ep_arg = smccc_get_arg(vcpu, 3);
+	set_bit(num, &vsdei->registered);
+
+	return SDEI_SUCCESS;
+}
+
 int kvm_sdei_call(struct kvm_vcpu *vcpu)
 {
 	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
@@ -31,6 +59,9 @@ int kvm_sdei_call(struct kvm_vcpu *vcpu)
 	}
 
 	switch (func) {
+	case SDEI_1_0_FN_SDEI_EVENT_REGISTER:
+		ret = event_register(vcpu);
+		break;
 	default:
 		ret = SDEI_NOT_SUPPORTED;
 	}
