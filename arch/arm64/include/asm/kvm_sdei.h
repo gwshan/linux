@@ -62,6 +62,9 @@ struct kvm_sdei_vcpu {
 	struct kvm_sdei_event_context	ctxt;
 };
 
+/* Returned as vendor through SDEI_VERSION hypercall */
+#define KVM_SDEI_VENDOR	ARM_SMCCC_VENDOR_HYP_UID_KVM_REG_2
+
 /* APIs */
 int kvm_sdei_call(struct kvm_vcpu *vcpu);
 int kvm_sdei_inject_event(struct kvm_vcpu *vcpu,
