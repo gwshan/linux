@@ -277,6 +277,19 @@ static unsigned long event_reset(struct kvm_vcpu *vcpu, bool private)
 	return SDEI_SUCCESS;
 }
 
+static unsigned long sdei_features(struct kvm_vcpu *vcpu)
+{
+	unsigned int feature = smccc_get_arg(vcpu, 1);
+
+	switch (feature) {
+	case SDEI_FEATURE_BIND_SLOTS:
+	case SDEI_FEATURE_RELATIVE_MODE:
+		return 0;
+	}
+
+	return SDEI_INVALID_PARAMETERS;
+}
+
 int kvm_sdei_call(struct kvm_vcpu *vcpu)
 {
 	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
@@ -336,6 +349,9 @@ int kvm_sdei_call(struct kvm_vcpu *vcpu)
 		break;
 	case SDEI_1_0_FN_SDEI_SHARED_RESET:
 		ret = event_reset(vcpu, false);
+		break;
+	case SDEI_1_1_FN_SDEI_FEATURES:
+		ret = sdei_features(vcpu);
 		break;
 	default:
 		ret = SDEI_NOT_SUPPORTED;
