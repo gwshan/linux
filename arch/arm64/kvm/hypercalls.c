@@ -65,9 +65,9 @@ static void kvm_ptp_get_time(struct kvm_vcpu *vcpu, u64 *val)
 	val[3] = lower_32_bits(cycles);
 }
 
-static bool kvm_hvc_call_default_allowed(u32 func_id)
+static bool kvm_hvc_call_default_allowed(u32 func)
 {
-	switch (func_id) {
+	switch (func) {
 	/*
 	 * List of function-ids that are not gated with the bitmapped
 	 * feature firmware registers, and are to be allowed for
@@ -78,26 +78,26 @@ static bool kvm_hvc_call_default_allowed(u32 func_id)
 		return true;
 	default:
 		/* PSCI 0.2 and up is in the 0:0x1f range */
-		if (ARM_SMCCC_OWNER_NUM(func_id) == ARM_SMCCC_OWNER_STANDARD &&
-		    ARM_SMCCC_FUNC_NUM(func_id) <= 0x1f)
+		if (ARM_SMCCC_OWNER_NUM(func) == ARM_SMCCC_OWNER_STANDARD &&
+		    ARM_SMCCC_FUNC_NUM(func) <= 0x1f)
 			return true;
 
 		/*
 		 * KVM's PSCI 0.1 doesn't comply with SMCCC, and has
 		 * its own function-id base and range
 		 */
-		if (func_id >= KVM_PSCI_FN(0) && func_id <= KVM_PSCI_FN(3))
+		if (func >= KVM_PSCI_FN(0) && func <= KVM_PSCI_FN(3))
 			return true;
 
 		return false;
 	}
 }
 
-static bool kvm_hvc_call_allowed(struct kvm_vcpu *vcpu, u32 func_id)
+static bool kvm_hvc_call_allowed(struct kvm_vcpu *vcpu, u32 func)
 {
 	struct kvm_smccc_features *smccc_feat = &vcpu->kvm->arch.smccc_feat;
 
-	switch (func_id) {
+	switch (func) {
 	case ARM_SMCCC_TRNG_VERSION:
 	case ARM_SMCCC_TRNG_FEATURES:
 	case ARM_SMCCC_TRNG_GET_UUID:
@@ -117,24 +117,19 @@ static bool kvm_hvc_call_allowed(struct kvm_vcpu *vcpu, u32 func_id)
 		return test_bit(KVM_REG_ARM_VENDOR_HYP_BIT_PTP,
 				&smccc_feat->vendor_hyp_bmap);
 	default:
-		return kvm_hvc_call_default_allowed(func_id);
+		return kvm_hvc_call_default_allowed(func);
 	}
 }
 
-int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+static int kvm_hvc_arch(struct kvm_vcpu *vcpu, u32 func)
 {
 	struct kvm_smccc_features *smccc_feat = &vcpu->kvm->arch.smccc_feat;
-	u32 func_id = smccc_get_function(vcpu);
-	u64 val[4] = {SMCCC_RET_NOT_SUPPORTED};
+	u64 val = SMCCC_RET_NOT_SUPPORTED;
 	u32 feature;
-	gpa_t gpa;
 
-	if (!kvm_hvc_call_allowed(vcpu, func_id))
-		goto out;
-
-	switch (func_id) {
+	switch (func) {
 	case ARM_SMCCC_VERSION_FUNC_ID:
-		val[0] = ARM_SMCCC_VERSION_1_1;
+		val = ARM_SMCCC_VERSION_1_1;
 		break;
 	case ARM_SMCCC_ARCH_FEATURES_FUNC_ID:
 		feature = smccc_get_arg(vcpu, 1);
@@ -144,10 +139,10 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
 			case SPECTRE_VULNERABLE:
 				break;
 			case SPECTRE_MITIGATED:
-				val[0] = SMCCC_RET_SUCCESS;
+				val = SMCCC_RET_SUCCESS;
 				break;
 			case SPECTRE_UNAFFECTED:
-				val[0] = SMCCC_ARCH_WORKAROUND_RET_UNAFFECTED;
+				val = SMCCC_ARCH_WORKAROUND_RET_UNAFFECTED;
 				break;
 			}
 			break;
@@ -170,7 +165,7 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
 					break;
 				fallthrough;
 			case SPECTRE_UNAFFECTED:
-				val[0] = SMCCC_RET_NOT_REQUIRED;
+				val = SMCCC_RET_NOT_REQUIRED;
 				break;
 			}
 			break;
@@ -179,28 +174,65 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
 			case SPECTRE_VULNERABLE:
 				break;
 			case SPECTRE_MITIGATED:
-				val[0] = SMCCC_RET_SUCCESS;
+				val = SMCCC_RET_SUCCESS;
 				break;
 			case SPECTRE_UNAFFECTED:
-				val[0] = SMCCC_ARCH_WORKAROUND_RET_UNAFFECTED;
+				val = SMCCC_ARCH_WORKAROUND_RET_UNAFFECTED;
 				break;
 			}
 			break;
 		case ARM_SMCCC_HV_PV_TIME_FEATURES:
 			if (test_bit(KVM_REG_ARM_STD_HYP_BIT_PV_TIME,
 				     &smccc_feat->std_hyp_bmap))
-				val[0] = SMCCC_RET_SUCCESS;
+				val = SMCCC_RET_SUCCESS;
 			break;
 		}
 		break;
+	}
+
+	smccc_set_retval(vcpu, val, 0, 0, 0);
+	return 1;
+}
+
+static int kvm_hvc_standard(struct kvm_vcpu *vcpu, u32 func)
+{
+	switch (ARM_SMCCC_FUNC_NUM(func)) {
+	case ARM_SMCCC_STANDARD_PSCI_START ... ARM_SMCCC_STANDARD_PSCI_END:
+		return kvm_psci_call(vcpu);
+	case ARM_SMCCC_STANDARD_TRNG_START ... ARM_SMCCC_STANDARD_TRNG_END:
+		return kvm_trng_call(vcpu);
+	}
+
+	smccc_set_retval(vcpu, SMCCC_RET_NOT_SUPPORTED, 0, 0, 0);
+	return 1;
+}
+
+static int kvm_hvc_standard_hyp(struct kvm_vcpu *vcpu, u32 func)
+{
+	u64 val = SMCCC_RET_NOT_SUPPORTED;
+	gpa_t gpa;
+
+	switch (func) {
 	case ARM_SMCCC_HV_PV_TIME_FEATURES:
-		val[0] = kvm_hypercall_pv_features(vcpu);
+		val = kvm_hypercall_pv_features(vcpu);
 		break;
 	case ARM_SMCCC_HV_PV_TIME_ST:
 		gpa = kvm_init_stolen_time(vcpu);
 		if (gpa != GPA_INVALID)
-			val[0] = gpa;
+			val = gpa;
 		break;
+	}
+
+	smccc_set_retval(vcpu, val, 0, 0, 0);
+	return 1;
+}
+
+static int kvm_hvc_vendor_hyp(struct kvm_vcpu *vcpu, u32 func)
+{
+	struct kvm_smccc_features *smccc_feat = &vcpu->kvm->arch.smccc_feat;
+	u64 val[4] = { SMCCC_RET_NOT_SUPPORTED };
+
+	switch (func) {
 	case ARM_SMCCC_VENDOR_HYP_CALL_UID_FUNC_ID:
 		val[0] = ARM_SMCCC_VENDOR_HYP_UID_KVM_REG_0;
 		val[1] = ARM_SMCCC_VENDOR_HYP_UID_KVM_REG_1;
@@ -213,18 +245,36 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
 	case ARM_SMCCC_VENDOR_HYP_KVM_PTP_FUNC_ID:
 		kvm_ptp_get_time(vcpu, val);
 		break;
-	case ARM_SMCCC_TRNG_VERSION:
-	case ARM_SMCCC_TRNG_FEATURES:
-	case ARM_SMCCC_TRNG_GET_UUID:
-	case ARM_SMCCC_TRNG_RND32:
-	case ARM_SMCCC_TRNG_RND64:
-		return kvm_trng_call(vcpu);
-	default:
+	}
+
+	smccc_set_retval(vcpu, val[0], val[1], val[2], val[3]);
+	return 1;
+}
+
+int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+{
+	u32 func = smccc_get_function(vcpu);
+
+	if (!kvm_hvc_call_allowed(vcpu, func))
+		goto out;
+
+	/* Filter these calls that aren't documented in the specification */
+	if (func >= KVM_PSCI_FN_CPU_SUSPEND && func <= KVM_PSCI_FN_MIGRATE)
 		return kvm_psci_call(vcpu);
+
+	switch (ARM_SMCCC_OWNER_NUM(func)) {
+	case ARM_SMCCC_OWNER_ARCH:
+		return kvm_hvc_arch(vcpu, func);
+	case ARM_SMCCC_OWNER_STANDARD:
+		return kvm_hvc_standard(vcpu, func);
+	case ARM_SMCCC_OWNER_STANDARD_HYP:
+		return kvm_hvc_standard_hyp(vcpu, func);
+	case ARM_SMCCC_OWNER_VENDOR_HYP:
+		return kvm_hvc_vendor_hyp(vcpu, func);
 	}
 
 out:
-	smccc_set_retval(vcpu, val[0], val[1], val[2], val[3]);
+	smccc_set_retval(vcpu, SMCCC_RET_NOT_SUPPORTED, 0, 0, 0);
 	return 1;
 }
 
