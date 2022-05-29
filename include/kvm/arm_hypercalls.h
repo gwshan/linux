@@ -8,24 +8,15 @@
 
 int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
 
+static inline unsigned long smccc_get_arg(struct kvm_vcpu *vcpu,
+					  unsigned char index)
+{
+	return vcpu_get_reg(vcpu, index);
+}
+
 static inline u32 smccc_get_function(struct kvm_vcpu *vcpu)
 {
-	return vcpu_get_reg(vcpu, 0);
-}
-
-static inline unsigned long smccc_get_arg1(struct kvm_vcpu *vcpu)
-{
-	return vcpu_get_reg(vcpu, 1);
-}
-
-static inline unsigned long smccc_get_arg2(struct kvm_vcpu *vcpu)
-{
-	return vcpu_get_reg(vcpu, 2);
-}
-
-static inline unsigned long smccc_get_arg3(struct kvm_vcpu *vcpu)
-{
-	return vcpu_get_reg(vcpu, 3);
+	return smccc_get_arg(vcpu, 0);
 }
 
 static inline void smccc_set_retval(struct kvm_vcpu *vcpu,
