@@ -366,6 +366,7 @@ struct kvm_vcpu_arch {
 	 * Anything that is not used directly from assembly code goes
 	 * here.
 	 */
+	struct kvm_sdei_vcpu *sdei;
 
 	/*
 	 * Guest registers we preserve during guest debugging.
@@ -466,6 +467,7 @@ struct kvm_vcpu_arch {
 #define KVM_ARM64_ON_UNSUPPORTED_CPU	(1 << 15) /* Physical CPU not in supported_cpus */
 #define KVM_ARM64_HOST_SME_ENABLED	(1 << 16) /* SME enabled for EL0 */
 #define KVM_ARM64_WFIT			(1 << 17) /* WFIT instruction trapped */
+#define KVM_ARM64_SDEI_MASKED		(1 << 18) /* SDEI is masked */
 
 #define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE | \
 				 KVM_GUESTDBG_USE_SW_BP | \

@@ -5,6 +5,7 @@
 #include <linux/kvm_host.h>
 
 #include <asm/kvm_emulate.h>
+#include <asm/kvm_sdei.h>
 
 #include <kvm/arm_hypercalls.h>
 #include <kvm/arm_psci.h>
@@ -199,6 +200,8 @@ static int kvm_hvc_standard(struct kvm_vcpu *vcpu, u32 func)
 	switch (ARM_SMCCC_FUNC_NUM(func)) {
 	case ARM_SMCCC_STANDARD_PSCI_START ... ARM_SMCCC_STANDARD_PSCI_END:
 		return kvm_psci_call(vcpu);
+	case ARM_SMCCC_STANDARD_SDEI_START ... ARM_SMCCC_STANDARD_SDEI_END:
+		return kvm_sdei_call(vcpu);
 	case ARM_SMCCC_STANDARD_TRNG_START ... ARM_SMCCC_STANDARD_TRNG_END:
 		return kvm_trng_call(vcpu);
 	}
