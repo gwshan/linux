@@ -44,7 +44,7 @@ static unsigned long event_register(struct kvm_vcpu *vcpu)
 static unsigned long event_enable(struct kvm_vcpu *vcpu, bool enable)
 {
 	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
-	unsigned int num = smccc_get_arg(vcpu, 1);
+	int num = smccc_get_arg(vcpu, 1);
 
 	if (num >= KVM_NR_SDEI_EVENTS)
 		return SDEI_INVALID_PARAMETERS;
@@ -66,6 +66,23 @@ static unsigned long event_enable(struct kvm_vcpu *vcpu, bool enable)
 	}
 
 	return SDEI_SUCCESS;
+}
+
+static unsigned long event_context(struct kvm_vcpu *vcpu)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_event_context *ctxt = &vsdei->ctxt;
+	unsigned int param_id = smccc_get_arg(vcpu, 1);
+
+	/* Reject if event handler isn't running */
+	if (!vsdei->running)
+		return SDEI_DENIED;
+
+	/* Reject if the parameter ID is out of range */
+	if (param_id >= ARRAY_SIZE(ctxt->regs))
+		return SDEI_INVALID_PARAMETERS;
+
+	return ctxt->regs[param_id];
 }
 
 int kvm_sdei_call(struct kvm_vcpu *vcpu)
@@ -94,6 +111,9 @@ int kvm_sdei_call(struct kvm_vcpu *vcpu)
 		break;
 	case SDEI_1_0_FN_SDEI_EVENT_DISABLE:
 		ret = event_enable(vcpu, false);
+		break;
+	case SDEI_1_0_FN_SDEI_EVENT_CONTEXT:
+		ret = event_context(vcpu);
 		break;
 	default:
 		ret = SDEI_NOT_SUPPORTED;
