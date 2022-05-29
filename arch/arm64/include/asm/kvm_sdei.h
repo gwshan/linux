@@ -73,6 +73,8 @@ int kvm_sdei_inject_event(struct kvm_vcpu *vcpu,
 			  unsigned int num, bool immediate);
 int kvm_sdei_cancel_event(struct kvm_vcpu *vcpu, unsigned int num);
 void kvm_sdei_deliver_event(struct kvm_vcpu *vcpu);
+int kvm_sdei_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+int kvm_sdei_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
 void kvm_sdei_create_vcpu(struct kvm_vcpu *vcpu);
 void kvm_sdei_destroy_vcpu(struct kvm_vcpu *vcpu);
 

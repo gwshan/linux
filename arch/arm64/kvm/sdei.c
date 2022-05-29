@@ -498,6 +498,167 @@ void kvm_sdei_deliver_event(struct kvm_vcpu *vcpu)
 	set_bit(num, &vsdei->running);
 }
 
+int kvm_sdei_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_event_context *ctxt = &vsdei->ctxt;
+	struct kvm_sdei_event_handler handler;
+	void __user *uaddr = (void __user *)(long)reg->addr;
+	unsigned int num, i;
+	unsigned long val, *pstate = NULL;
+
+	if (!vsdei)
+		return -EPERM;
+
+	switch (reg->id) {
+	case KVM_REG_ARM_SDEI_EVENT_HANDLER_0:
+	case KVM_REG_ARM_SDEI_EVENT_HANDLER_1:
+	case KVM_REG_ARM_SDEI_EVENT_HANDLER_2:
+	case KVM_REG_ARM_SDEI_EVENT_HANDLER_3:
+		 num = (reg->id & 0xffff) -
+		       (KVM_REG_ARM_SDEI_EVENT_HANDLER_0 & 0xffff);
+
+		if (num < KVM_NR_SDEI_EVENTS)
+			handler = vsdei->handlers[num];
+		else
+			memset(&handler, 0, sizeof(handler));
+
+		if (copy_to_user(uaddr, &handler, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
+		break;
+	case KVM_REG_ARM_SDEI_EVENT_REGISTERED:
+		pstate = &vsdei->registered;
+		fallthrough;
+	case KVM_REG_ARM_SDEI_EVENT_ENABLED:
+		pstate = pstate ? : &vsdei->enabled;
+		fallthrough;
+	case KVM_REG_ARM_SDEI_EVENT_RUNNING:
+		pstate = pstate ? : &vsdei->running;
+		fallthrough;
+	case KVM_REG_ARM_SDEI_EVENT_PENDING:
+		pstate = pstate ? : &vsdei->pending;
+		if (copy_to_user(uaddr, pstate, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
+		break;
+	case KVM_REG_ARM_SDEI_EVENT_CONTEXT:
+		if (copy_to_user(uaddr, &ctxt->pc, sizeof(ctxt->pc)))
+			return -EFAULT;
+
+		uaddr += sizeof(ctxt->pc);
+		if (copy_to_user(uaddr, &ctxt->pstate, sizeof(ctxt->pstate)))
+			return -EFAULT;
+
+		uaddr += sizeof(ctxt->pstate);
+		for (i = 0; i < ARRAY_SIZE(ctxt->regs); i++) {
+			if (copy_to_user(uaddr, &ctxt->regs[i],
+					 sizeof(ctxt->regs[i])))
+				return -EFAULT;
+
+			uaddr += sizeof(ctxt->regs[i]);
+		}
+
+		break;
+	case KVM_REG_ARM_SDEI_PE_STATE:
+		val = (vcpu->arch.flags & KVM_ARM64_SDEI_MASKED) ? 1 : 0;
+		if (copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
+		break;
+	default:
+		return -ENOENT;
+	}
+
+	return 0;
+}
+
+int kvm_sdei_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_event_context *ctxt = &vsdei->ctxt;
+	void __user *uaddr = (void __user *)(long)reg->addr;
+	unsigned int num, i;
+	unsigned long val, *pstate = NULL;
+
+	if (!vsdei)
+		return -EPERM;
+
+	switch (reg->id) {
+	case KVM_REG_ARM_SDEI_EVENT_HANDLER_0:
+	case KVM_REG_ARM_SDEI_EVENT_HANDLER_1:
+	case KVM_REG_ARM_SDEI_EVENT_HANDLER_2:
+	case KVM_REG_ARM_SDEI_EVENT_HANDLER_3:
+		num = (reg->id & 0xffff) -
+		      (KVM_REG_ARM_SDEI_EVENT_HANDLER_0 & 0xffff);
+		if (num >= KVM_NR_SDEI_EVENTS)
+			break;
+
+		if (copy_from_user(&vsdei->handlers[num], uaddr,
+				   sizeof(vsdei->handlers[num])))
+			return -EFAULT;
+
+		break;
+	case KVM_REG_ARM_SDEI_EVENT_REGISTERED:
+		pstate = &vsdei->registered;
+		fallthrough;
+	case KVM_REG_ARM_SDEI_EVENT_ENABLED:
+		pstate = pstate ? : &vsdei->enabled;
+		fallthrough;
+	case KVM_REG_ARM_SDEI_EVENT_RUNNING:
+		pstate = pstate ? : &vsdei->running;
+		fallthrough;
+	case KVM_REG_ARM_SDEI_EVENT_PENDING:
+		pstate = pstate ? : &vsdei->pending;
+		if (copy_from_user(&val, uaddr, sizeof(val)))
+			return -EFAULT;
+
+		*pstate = (val & GENMASK(KVM_NR_SDEI_EVENTS - 1, 0));
+		if (!(vcpu->arch.flags & KVM_ARM64_SDEI_MASKED) &&
+		    pstate == &vsdei->pending &&
+		    vsdei->pending)
+			kvm_make_request(KVM_REQ_SDEI, vcpu);
+
+		break;
+	case KVM_REG_ARM_SDEI_EVENT_CONTEXT:
+		if (copy_from_user(&ctxt->pc, uaddr, sizeof(ctxt->pc)))
+			return -EFAULT;
+
+		uaddr += sizeof(ctxt->pc);
+		if (copy_from_user(&ctxt->pstate, uaddr, sizeof(ctxt->pstate)))
+			return -EFAULT;
+
+		uaddr += sizeof(ctxt->pstate);
+		for (i = 0; i < ARRAY_SIZE(ctxt->regs); i++) {
+			if (copy_from_user(&ctxt->regs[i], uaddr,
+					   sizeof(ctxt->regs[i])))
+				return -EFAULT;
+
+			uaddr += sizeof(ctxt->regs[i]);
+		}
+
+		break;
+	case KVM_REG_ARM_SDEI_PE_STATE:
+		if (copy_from_user(&val, uaddr, sizeof(val)))
+			return -EFAULT;
+
+		if (val) {
+			vcpu->arch.flags |= KVM_ARM64_SDEI_MASKED;
+		} else {
+			vcpu->arch.flags &= ~KVM_ARM64_SDEI_MASKED;
+			if (vsdei->pending)
+				kvm_make_request(KVM_REQ_SDEI, vcpu);
+		}
+
+		break;
+	default:
+		return -ENOENT;
+	}
+
+	return 0;
+
+}
+
 void kvm_sdei_create_vcpu(struct kvm_vcpu *vcpu)
 {
 	struct kvm_sdei_vcpu *vsdei;
