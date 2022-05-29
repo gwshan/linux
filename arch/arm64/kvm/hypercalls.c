@@ -406,14 +406,20 @@ int kvm_arm_get_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 	return 0;
 }
 
-static int kvm_arm_set_fw_reg_bmap(struct kvm_vcpu *vcpu, u64 reg_id, u64 val)
+static int kvm_arm_set_fw_reg_bmap(struct kvm_vcpu *vcpu,
+				   const struct kvm_one_reg *reg)
 {
 	int ret = 0;
 	struct kvm *kvm = vcpu->kvm;
 	struct kvm_smccc_features *smccc_feat = &kvm->arch.smccc_feat;
 	unsigned long *fw_reg_bmap, fw_reg_features;
+	void __user *uaddr = (void __user *)(long)reg->addr;
+	u64 val;
 
-	switch (reg_id) {
+	if (copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id)))
+		return -EFAULT;
+
+	switch (reg->id) {
 	case KVM_REG_ARM_STD_BMAP:
 		fw_reg_bmap = &smccc_feat->std_bmap;
 		fw_reg_features = KVM_ARM_SMCCC_STD_FEATURES;
@@ -454,15 +460,14 @@ int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 	u64 val;
 	int wa_level;
 
-	if (copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id)))
-		return -EFAULT;
-
 	switch (reg->id) {
 	case KVM_REG_ARM_PSCI_VERSION:
 	{
 		bool wants_02;
 
 		wants_02 = test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features);
+		if (copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
 
 		switch (val) {
 		case KVM_ARM_PSCI_0_1:
@@ -483,6 +488,9 @@ int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 
 	case KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1:
 	case KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_3:
+		if (copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
 		if (val & ~KVM_REG_FEATURE_LEVEL_MASK)
 			return -EINVAL;
 
@@ -492,6 +500,9 @@ int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 		return 0;
 
 	case KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2:
+		if (copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
 		if (val & ~(KVM_REG_FEATURE_LEVEL_MASK |
 			    KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED))
 			return -EINVAL;
@@ -529,7 +540,7 @@ int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 	case KVM_REG_ARM_STD_BMAP:
 	case KVM_REG_ARM_STD_HYP_BMAP:
 	case KVM_REG_ARM_VENDOR_HYP_BMAP:
-		return kvm_arm_set_fw_reg_bmap(vcpu, reg->id, val);
+		return kvm_arm_set_fw_reg_bmap(vcpu, reg);
 	default:
 		return -ENOENT;
 	}
