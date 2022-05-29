@@ -232,6 +232,31 @@ static unsigned long pe_mask(struct kvm_vcpu *vcpu, bool mask)
 	return SDEI_SUCCESS;
 }
 
+static unsigned long event_signal(struct kvm_vcpu *vcpu)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	unsigned int num = smccc_get_arg(vcpu, 1);
+
+	if (num >= KVM_NR_SDEI_EVENTS)
+		return SDEI_INVALID_PARAMETERS;
+
+	/*
+	 * The event must be software signaled event, whose
+	 * number is zero.
+	 */
+	if (num != SDEI_SW_SIGNALED_EVENT ||
+	    !test_bit(num, &vsdei->registered))
+		return SDEI_INVALID_PARAMETERS;
+
+	if (!test_and_set_bit(num, &vsdei->pending)) {
+		if (!(vcpu->arch.flags & KVM_ARM64_SDEI_MASKED) &&
+		    test_bit(num, &vsdei->enabled))
+			kvm_make_request(KVM_REQ_SDEI, vcpu);
+	}
+
+	return SDEI_SUCCESS;
+}
+
 static unsigned long event_reset(struct kvm_vcpu *vcpu, bool private)
 {
 	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
@@ -302,6 +327,9 @@ int kvm_sdei_call(struct kvm_vcpu *vcpu)
 		break;
 	case SDEI_1_0_FN_SDEI_PE_UNMASK:
 		ret = pe_mask(vcpu, false);
+		break;
+	case SDEI_1_1_FN_SDEI_EVENT_SIGNAL:
+		ret = event_signal(vcpu);
 		break;
 	case SDEI_1_0_FN_SDEI_PRIVATE_RESET:
 		ret = event_reset(vcpu, true);
