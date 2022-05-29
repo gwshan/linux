@@ -64,6 +64,10 @@ struct kvm_sdei_vcpu {
 
 /* APIs */
 int kvm_sdei_call(struct kvm_vcpu *vcpu);
+int kvm_sdei_inject_event(struct kvm_vcpu *vcpu,
+			  unsigned int num, bool immediate);
+int kvm_sdei_cancel_event(struct kvm_vcpu *vcpu, unsigned int num);
+void kvm_sdei_deliver_event(struct kvm_vcpu *vcpu);
 void kvm_sdei_create_vcpu(struct kvm_vcpu *vcpu);
 void kvm_sdei_destroy_vcpu(struct kvm_vcpu *vcpu);
 

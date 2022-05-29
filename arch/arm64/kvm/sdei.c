@@ -266,6 +266,129 @@ out:
 	return 1;
 }
 
+int kvm_sdei_inject_event(struct kvm_vcpu *vcpu,
+			  unsigned int num,
+			  bool immediate)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+
+	if (!vsdei)
+		return -EPERM;
+
+	if (num >= KVM_NR_SDEI_EVENTS || !test_bit(num, &vsdei->registered))
+		return -ENOENT;
+
+	/*
+	 * The event may be expected to be delivered immediately. There
+	 * are several cases we can't do this:
+	 *
+	 * (1) The PE has been masked from any events.
+	 * (2) The event isn't enabled yet.
+	 * (3) There are any pending or running events.
+	 */
+	if (immediate &&
+	    ((vcpu->arch.flags & KVM_ARM64_SDEI_MASKED) ||
+	    !test_bit(num, &vsdei->enabled) ||
+	    vsdei->pending || vsdei->running))
+		return -EBUSY;
+
+	set_bit(num, &vsdei->pending);
+	if (!(vcpu->arch.flags & KVM_ARM64_SDEI_MASKED) &&
+	    test_bit(num, &vsdei->enabled))
+		kvm_make_request(KVM_REQ_SDEI, vcpu);
+
+	return 0;
+}
+
+int kvm_sdei_cancel_event(struct kvm_vcpu *vcpu, unsigned int num)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+
+	if (!vsdei)
+		return -EPERM;
+
+	if (num >= KVM_NR_SDEI_EVENTS || !test_bit(num, &vsdei->registered))
+		return -ENOENT;
+
+	if (test_bit(num, &vsdei->running))
+		return -EBUSY;
+
+	clear_bit(num, &vsdei->pending);
+
+	return 0;
+}
+
+void kvm_sdei_deliver_event(struct kvm_vcpu *vcpu)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_event_context *ctxt = &vsdei->ctxt;
+	unsigned int num, i;
+	unsigned long pstate;
+
+	if (!vsdei || (vcpu->arch.flags & KVM_ARM64_SDEI_MASKED))
+		return;
+
+	/*
+	 * All supported events have normal priority. So the currently
+	 * running event can't be preempted by any one else.
+	 */
+	if (vsdei->running)
+		return;
+
+	/* Select next pending event to be delivered */
+	num = 0;
+	while (num < KVM_NR_SDEI_EVENTS) {
+		num = find_next_bit(&vsdei->pending, KVM_NR_SDEI_EVENTS, num);
+		if (test_bit(num, &vsdei->enabled))
+			break;
+	}
+
+	if (num >= KVM_NR_SDEI_EVENTS)
+		return;
+
+	/*
+	 * Save the interrupted context. We might have pending request
+	 * to adjust PC. Lets adjust it now so that the resume address
+	 * is correct when COMPLETE or COMPLETE_AND_RESUME hypercall
+	 * is handled.
+	 */
+	__kvm_adjust_pc(vcpu);
+	ctxt->pc = *vcpu_pc(vcpu);
+	ctxt->pstate = *vcpu_cpsr(vcpu);
+	for (i = 0; i < ARRAY_SIZE(ctxt->regs); i++)
+		ctxt->regs[i] = vcpu_get_reg(vcpu, i);
+
+	/*
+	 * Inject event. The following registers are modified according
+	 * to the specification.
+	 *
+	 * x0: event number
+	 * x1: argument specified when the event is registered
+	 * x2: PC of the interrupted context
+	 * x3: PSTATE of the interrupted context
+	 * PC: event handler
+	 * PSTATE: Cleared nRW bit, but D/A/I/F bits are set
+	 */
+	for (i = 0; i < ARRAY_SIZE(ctxt->regs); i++)
+		vcpu_set_reg(vcpu, i, 0);
+
+	vcpu_set_reg(vcpu, 0, num);
+	vcpu_set_reg(vcpu, 1, vsdei->handlers[num].ep_arg);
+	vcpu_set_reg(vcpu, 2, ctxt->pc);
+	vcpu_set_reg(vcpu, 3, ctxt->pstate);
+
+	pstate = ctxt->pstate;
+	pstate &= ~(PSR_MODE32_BIT | PSR_MODE_MASK);
+	pstate |= (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT | PSR_MODE_EL1h);
+
+	*vcpu_cpsr(vcpu) = pstate;
+	*vcpu_pc(vcpu) = vsdei->handlers[num].ep_addr;
+
+	/* Update event states */
+	clear_bit(num, &vsdei->pending);
+	set_bit(num, &vsdei->running);
+}
+
 void kvm_sdei_create_vcpu(struct kvm_vcpu *vcpu)
 {
 	struct kvm_sdei_vcpu *vsdei;
