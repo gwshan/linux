@@ -666,10 +666,14 @@ void kvm_sdei_create_vcpu(struct kvm_vcpu *vcpu)
 	vcpu->arch.sdei = kzalloc(sizeof(*vsdei), GFP_KERNEL_ACCOUNT);
 	if (vcpu->arch.sdei)
 		vcpu->arch.flags |= KVM_ARM64_SDEI_MASKED;
+
+	kvm_sdei_test_create_vcpu(vcpu);
 }
 
 void kvm_sdei_destroy_vcpu(struct kvm_vcpu *vcpu)
 {
+	kvm_sdei_test_destroy_vcpu(vcpu);
+
 	vcpu->arch.flags &= ~KVM_ARM64_SDEI_MASKED;
 	kfree(vcpu->arch.sdei);
 	vcpu->arch.sdei = NULL;

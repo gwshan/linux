@@ -14,6 +14,8 @@
 #include <linux/arm-smccc.h>
 #include <linux/bits.h>
 
+#define KVM_SDEI_TEST
+
 enum {
 	KVM_SDEI_EVENT_SW_SIGNALED = 0,
 	KVM_SDEI_EVENT_ASYNC_PF,
@@ -62,6 +64,9 @@ struct kvm_sdei_vcpu {
 
 	struct kvm_sdei_event_handler	handlers[KVM_NR_SDEI_EVENTS];
 	struct kvm_sdei_event_context	ctxt;
+#ifdef KVM_SDEI_TEST
+	struct proc_dir_entry		*pde;
+#endif
 };
 
 /* Returned as vendor through SDEI_VERSION hypercall */
@@ -77,5 +82,13 @@ int kvm_sdei_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
 int kvm_sdei_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
 void kvm_sdei_create_vcpu(struct kvm_vcpu *vcpu);
 void kvm_sdei_destroy_vcpu(struct kvm_vcpu *vcpu);
+
+#ifdef KVM_SDEI_TEST
+void kvm_sdei_test_create_vcpu(struct kvm_vcpu *vcpu);
+void kvm_sdei_test_destroy_vcpu(struct kvm_vcpu *vcpu);
+#else
+void kvm_sdei_test_create_vcpu(struct kvm_vcpu *vcpu) { }
+void kvm_sdei_test_destroy_vcpu(struct kvm_vcpu *vcpu) { }
+#endif /* KVM_SDEI_TEST */
 
 #endif /* __ARM64_KVM_SDEI_H__ */
