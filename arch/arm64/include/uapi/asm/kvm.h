@@ -344,6 +344,7 @@ struct kvm_arm_copy_mte_tags {
 
 enum {
 	KVM_REG_ARM_STD_BIT_TRNG_V1_0	= 0,
+	KVM_REG_ARM_STD_BIT_SDEI,
 #ifdef __KERNEL__
 	KVM_REG_ARM_STD_BMAP_BIT_COUNT,
 #endif

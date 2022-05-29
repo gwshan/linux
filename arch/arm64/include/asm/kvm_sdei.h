@@ -15,6 +15,8 @@
 #include <linux/bits.h>
 
 enum {
+	KVM_SDEI_EVENT_SW_SIGNALED = 0,
+	KVM_SDEI_EVENT_ASYNC_PF,
 	KVM_NR_SDEI_EVENTS,
 };
 

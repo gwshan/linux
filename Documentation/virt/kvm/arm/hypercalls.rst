@@ -106,6 +106,10 @@ The pseudo-firmware bitmap register are as follows:
       The bit represents the services offered under v1.0 of ARM True Random
       Number Generator (TRNG) specification, ARM DEN0098.
 
+    Bit-1: KVM_REG_ARM_STD_BIT_SDEI:
+      The bit represents the services offered under v1.1 of ARM Software
+      Delegated Exception Interface (SDEI) specification, ARM DEN0054C.
+
 * KVM_REG_ARM_STD_HYP_BMAP:
     Controls the bitmap of the ARM Standard Hypervisor Service Calls.
 

@@ -99,6 +99,10 @@ static bool kvm_hvc_call_allowed(struct kvm_vcpu *vcpu, u32 func)
 	struct kvm_smccc_features *smccc_feat = &vcpu->kvm->arch.smccc_feat;
 
 	switch (func) {
+	case SDEI_1_0_FN(ARM_SMCCC_STANDARD_SDEI_START - 0x20) ...
+	     SDEI_1_0_FN(ARM_SMCCC_STANDARD_SDEI_END - 0x20):
+		return test_bit(KVM_REG_ARM_STD_BIT_SDEI,
+				&smccc_feat->std_bmap);
 	case ARM_SMCCC_TRNG_VERSION:
 	case ARM_SMCCC_TRNG_FEATURES:
 	case ARM_SMCCC_TRNG_GET_UUID:
