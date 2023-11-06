@@ -20,7 +20,7 @@
 
 #define TEST_DEFAULT_LOOPS	1UL
 #define TEST_DEFAULT_ITERATIONS	100000UL
-#define TEST_MEM_SIZE		0x400000UL
+#define TEST_MEM_SIZE		0x20000000UL
 #define TEST_MEM_MASK		((TEST_MEM_SIZE / 2) - 1)
 
 struct test_cache {
@@ -63,6 +63,17 @@ static struct test_cache_case test_cases[] = {
 	  .num_of_sets = 0x800,
 	  .steps = 16,
 	},
+	{ .name = "L3 cache base",
+	  .cache_line_size = 64,
+	  .num_of_sets = 0x800,
+	  .steps = 16,
+	},
+	{ .name = "L3 cache miss",
+	  .cache_line_size = 64,
+	  .num_of_sets = 0x8000,
+	  .steps = 32,
+	},
+
 };
 
 static void usage(char *name)
