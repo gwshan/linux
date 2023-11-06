@@ -29,6 +29,9 @@
 	mrs	x1, elr_el1
 	mrs	x2, spsr_el1
 	stp	x1, x2, [sp, #16 * 16] /* PC, PSTATE */
+
+	mrs	x1, esr_el1
+	str	x1, [sp, #16 * 17 ]    /* ESR_EL1 */
 .endm
 
 .macro restore_registers
