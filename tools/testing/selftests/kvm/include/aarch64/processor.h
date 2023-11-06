@@ -69,6 +69,7 @@ struct ex_regs {
 	u64 sp;
 	u64 pc;
 	u64 pstate;
+	u64 esr_el1;
 };
 
 #define VECTOR_NUM	16
