@@ -125,10 +125,9 @@ void virt_arch_pgd_alloc(struct kvm_vm *vm)
 	vm->pgd_created = true;
 }
 
-static void _virt_pg_map(struct kvm_vm *vm, uint64_t vaddr, uint64_t paddr,
-			 uint64_t flags)
+void __virt_pg_map(struct kvm_vm *vm, uint64_t vaddr,
+		   uint64_t paddr, uint64_t attr_idx)
 {
-	uint8_t attr_idx = flags & 7;
 	uint64_t *ptep;
 
 	TEST_ASSERT((vaddr % vm->page_size) == 0,
@@ -174,7 +173,7 @@ void virt_arch_pg_map(struct kvm_vm *vm, uint64_t vaddr, uint64_t paddr)
 {
 	uint64_t attr_idx = MT_NORMAL;
 
-	_virt_pg_map(vm, vaddr, paddr, attr_idx);
+	__virt_pg_map(vm, vaddr, paddr, attr_idx);
 }
 
 uint64_t *virt_get_pte_hva(struct kvm_vm *vm, vm_vaddr_t gva)
