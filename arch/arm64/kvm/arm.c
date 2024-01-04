@@ -2129,11 +2129,17 @@ static long pkvm_filter_vcpu_ioctl(struct kvm_vcpu *vcpu, unsigned int ioctl)
 	case KVM_ARM_VCPU_INIT:
 	case KVM_SET_ONE_REG:
 	case KVM_GET_ONE_REG:
-		if (vcpu_is_protected(vcpu) && vcpu_has_run_once(vcpu))
+		if (vcpu_is_protected_pkvm(vcpu) && vcpu_has_run_once(vcpu))
 			return -EPERM;
 	}
 
 	return 0;
+}
+
+/* Realm register lists are available before vCPU finalization. */
+static bool kvm_arm_vcpu_reg_list_allowed(struct kvm_vcpu *vcpu)
+{
+	return kvm_arm_vcpu_is_finalized(vcpu) || vcpu_is_rec(vcpu);
 }
 
 long kvm_arch_vcpu_ioctl(struct file *filp,
@@ -2195,7 +2201,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 			break;
 
 		r = -EPERM;
-		if (!kvm_arm_vcpu_is_finalized(vcpu))
+		if (!kvm_arm_vcpu_reg_list_allowed(vcpu))
 			break;
 
 		r = -EFAULT;
