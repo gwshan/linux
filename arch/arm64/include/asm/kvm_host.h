@@ -1560,6 +1560,8 @@ struct kvm *kvm_arch_alloc_vm(void);
 #define vcpu_is_protected(vcpu)		kvm_vm_is_protected((vcpu)->kvm)
 #define vcpu_is_rec(vcpu)		kvm_vm_is_realm((vcpu)->kvm)
 
+#define kvm_arch_has_private_mem(kvm) kvm_vm_is_realm(kvm)
+
 int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu, int feature);
 bool kvm_arm_vcpu_is_finalized(struct kvm_vcpu *vcpu);
 
