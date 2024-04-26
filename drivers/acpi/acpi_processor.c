@@ -216,7 +216,6 @@ static int acpi_processor_hotadd_init(struct acpi_processor *pr)
 	 * gets online for the first time.
 	 */
 	pr_info("CPU%d has been hot-added\n", pr->id);
-	pr->flags.need_hotplug_init = 1;
 
 out:
 	cpus_write_unlock();
