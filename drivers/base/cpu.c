@@ -568,6 +568,7 @@ static void __init cpu_dev_register_generic(void)
 
 	for_each_present_cpu(i) {
 		ret = arch_register_cpu(i);
+		pr_info("%s: %d returned from arch_register_cpu(%d)\n", __func__, ret, i);
 		if (ret && ret != -EPROBE_DEFER)
 			pr_warn("register_cpu %d failed (%d)\n", i, ret);
 	}
@@ -655,6 +656,11 @@ static inline void cpu_register_vulnerabilities(void) { }
 
 void __init cpu_dev_init(void)
 {
+
+	pr_info("\n");
+	pr_info("*****************************************\n");
+	pr_info("\n");
+
 	if (subsys_system_register(&cpu_subsys, cpu_root_attr_groups))
 		panic("Failed to register CPU subsystem");
 

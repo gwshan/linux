@@ -424,8 +424,19 @@ static int acpi_processor_add(struct acpi_device *device,
 	struct device *dev;
 	int result = 0;
 
-	if (!acpi_device_is_enabled(device))
+	pr_info("\n");
+	pr_info("*****************************************\n");
+	pr_info("\n");
+	dump_stack();
+
+	pr_info("%s: device@0x%lx\n", __func__, (unsigned long)device);
+
+	if (!acpi_device_is_enabled(device)) {
+		pr_info("%s: ACPI device isn't enabled (present: %s  enabled: %s)\n",
+			__func__, device->status.present ? "yes" : "no",
+			device->status.enabled ? "yes" : "no");
 		return -ENODEV;
+	}
 
 	pr = kzalloc(sizeof(struct acpi_processor), GFP_KERNEL);
 	if (!pr)

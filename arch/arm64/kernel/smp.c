@@ -739,6 +739,12 @@ void __init smp_init_cpus(void)
 {
 	int i;
 
+	pr_info("===> %s: enter\n", __func__);
+	pr_info("cpu_possible_mask:  %*pbl\n", cpumask_pr_args(cpu_possible_mask));
+	pr_info("cpu_enabled_mask:   %*pbl\n", cpumask_pr_args(cpu_enabled_mask));
+	pr_info("cpu_present_mask:   %*pbl\n", cpumask_pr_args(cpu_present_mask));
+	pr_info("cpu_online_mask:    %*pbl\n", cpumask_pr_args(cpu_online_mask));
+
 	if (acpi_disabled)
 		of_parse_and_init_cpus();
 	else
@@ -766,6 +772,12 @@ void __init smp_init_cpus(void)
 				set_cpu_logical_map(i, INVALID_HWID);
 		}
 	}
+
+	pr_info("===> %s: exit\n", __func__);
+	pr_info("cpu_possible_mask:  %*pbl\n", cpumask_pr_args(cpu_possible_mask));
+	pr_info("cpu_enabled_mask:   %*pbl\n", cpumask_pr_args(cpu_enabled_mask));
+	pr_info("cpu_present_mask:   %*pbl\n", cpumask_pr_args(cpu_present_mask));
+	pr_info("cpu_online_mask:    %*pbl\n", cpumask_pr_args(cpu_online_mask));
 }
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
@@ -774,6 +786,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	int err;
 	unsigned int cpu;
 	unsigned int this_cpu;
+
+	pr_info("===> %s: enter\n", __func__);
+	pr_info("cpu_possible_mask:  %*pbl\n", cpumask_pr_args(cpu_possible_mask));
+	pr_info("cpu_enabled_mask:   %*pbl\n", cpumask_pr_args(cpu_enabled_mask));
+	pr_info("cpu_present_mask:   %*pbl\n", cpumask_pr_args(cpu_present_mask));
+	pr_info("cpu_online_mask:    %*pbl\n", cpumask_pr_args(cpu_online_mask));
 
 	init_cpu_topology();
 
@@ -812,6 +830,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		set_cpu_present(cpu, true);
 		numa_store_cpu_info(cpu);
 	}
+
+	pr_info("===> %s: exit\n", __func__);
+	pr_info("cpu_possible_mask:  %*pbl\n", cpumask_pr_args(cpu_possible_mask));
+	pr_info("cpu_enabled_mask:   %*pbl\n", cpumask_pr_args(cpu_enabled_mask));
+	pr_info("cpu_present_mask:   %*pbl\n", cpumask_pr_args(cpu_present_mask));
+	pr_info("cpu_online_mask:    %*pbl\n", cpumask_pr_args(cpu_online_mask));
 }
 
 static const char *ipi_types[NR_IPI] __tracepoint_string = {

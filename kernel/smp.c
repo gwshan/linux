@@ -972,6 +972,12 @@ void __init smp_init(void)
 {
 	int num_nodes, num_cpus;
 
+	pr_info("===> %s: enter\n", __func__);
+	pr_info("cpu_possible_mask:  %*pbl\n", cpumask_pr_args(cpu_possible_mask));
+	pr_info("cpu_enabled_mask:   %*pbl\n", cpumask_pr_args(cpu_enabled_mask));
+	pr_info("cpu_present_mask:   %*pbl\n", cpumask_pr_args(cpu_present_mask));
+	pr_info("cpu_online_mask:    %*pbl\n", cpumask_pr_args(cpu_online_mask));
+
 	idle_threads_init();
 	cpuhp_threads_init();
 
@@ -987,6 +993,12 @@ void __init smp_init(void)
 
 	/* Any cleanup work */
 	smp_cpus_done(setup_max_cpus);
+
+	pr_info("===> %s: exit\n", __func__);
+	pr_info("cpu_possible_mask:  %*pbl\n", cpumask_pr_args(cpu_possible_mask));
+	pr_info("cpu_enabled_mask:   %*pbl\n", cpumask_pr_args(cpu_enabled_mask));
+	pr_info("cpu_present_mask:   %*pbl\n", cpumask_pr_args(cpu_present_mask));
+	pr_info("cpu_online_mask:    %*pbl\n", cpumask_pr_args(cpu_online_mask));
 }
 
 /*
