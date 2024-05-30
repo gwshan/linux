@@ -2455,7 +2455,7 @@ static int arm_cmn_probe(struct platform_device *pdev)
 		 */
 		cfg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 		if (!cfg)
-			return PTR_ERR(-EINVAL);
+			return -EINVAL;
 		cmn->base = devm_ioremap(&pdev->dev, cfg->start, resource_size(cfg));
 		if (IS_ERR(cmn->base))
 			return PTR_ERR(cmn->base);
