@@ -23,8 +23,9 @@
 enum {
 	DUMP_OPT_HELP,
 	DUMP_OPT_REGISTER,
-	DUMP_OPT_REGISTER_CACHE,
-	DUMP_OPT_REGISTER_MPAM,
+	DUMP_OPT_FEATURE_REGISTER,
+	DUMP_OPT_CACHE_REGISTER,
+	DUMP_OPT_MPAM_REGISTER,
 	DUMP_OPT_PROCESS,
 	DUMP_OPT_MM,
 	DUMP_OPT_MM_MT,
@@ -32,12 +33,13 @@ enum {
 };
 
 static struct proc_dir_entry *pde;
-static int dump_option = DUMP_OPT_REGISTER_MPAM;
+static int dump_option = DUMP_OPT_HELP;
 static const char * const dump_options[] = {
 	"help",
 	"register",
-	"register_cache",
-	"register_mpam",
+	"feature_register",
+	"cache_register",
+	"mpam_register",
 	"process",
 	"mm",
 	"mm_maple_tree",
@@ -54,6 +56,389 @@ static void dump_show_help(struct seq_file *m)
 		seq_printf(m, "%s\n", dump_options[i]);
 
 	seq_puts(m, "\n");
+}
+
+static void dump_show_register(struct seq_file *m)
+{
+	unsigned long v;
+
+	/* PSTATE */
+	v = read_sysreg(NZCV);
+	seq_printf(m, "PSTATE:\n");
+	seq_puts  (m, "----------------------------------------------\n");
+	v = read_sysreg(NZCV);
+	seq_printf(m, "   31 N                 %lx\n", FIELD_GET(GENMASK(31, 31), v));
+	seq_printf(m, "   30 Z                 %lx\n", FIELD_GET(GENMASK(30, 30), v));
+	seq_printf(m, "   29 C                 %lx\n", FIELD_GET(GENMASK(29, 29), v));
+	seq_printf(m, "   28 V                 %lx\n", FIELD_GET(GENMASK(28, 28), v));
+	v = read_sysreg(DAIF);
+	seq_printf(m, "   09 D                 %lx\n", FIELD_GET(GENMASK( 9,  9), v));
+	seq_printf(m, "   08 A                 %lx\n", FIELD_GET(GENMASK( 8,  8), v));
+	seq_printf(m, "   07 I                 %lx\n", FIELD_GET(GENMASK( 7,  7), v));
+	seq_printf(m, "   06 F                 %lx\n", FIELD_GET(GENMASK( 6,  6), v));
+	v = read_sysreg(CurrentEL);
+	seq_printf(m, "03:02 EL                %lx\n", FIELD_GET(GENMASK( 3,  2), v));
+	seq_puts  (m, "\n");
+
+	v = read_sysreg(CurrentEL);
+	if (v == 0x4) {		/* EL1 */
+		/* SCTLR_EL1 */
+		v = read_sysreg_s(SYS_SCTLR_EL1);
+		seq_printf(m, "SCTLR_EL1:              %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "   63 TIDCP             %lx\n", FIELD_GET(GENMASK(63, 63), v));
+		seq_printf(m, "   62 SPINTMASK         %lx\n", FIELD_GET(GENMASK(62, 62), v));
+		seq_printf(m, "   61 NMI               %lx\n", FIELD_GET(GENMASK(61, 61), v));
+		seq_printf(m, "   60 EnTP2             %lx\n", FIELD_GET(GENMASK(60, 60), v));
+		seq_printf(m, "   59 TCSO              %lx\n", FIELD_GET(GENMASK(59, 59), v));
+		seq_printf(m, "   58 TCSO0             %lx\n", FIELD_GET(GENMASK(58, 58), v));
+		seq_printf(m, "   57 EPAN              %lx\n", FIELD_GET(GENMASK(57, 57), v));
+		seq_printf(m, "   56 EnALS             %lx\n", FIELD_GET(GENMASK(56, 56), v));
+		seq_printf(m, "   55 EnAS0             %lx\n", FIELD_GET(GENMASK(55, 55), v));
+		seq_printf(m, "   54 EnASR             %lx\n", FIELD_GET(GENMASK(54, 54), v));
+		seq_printf(m, "   53 TME               %lx\n", FIELD_GET(GENMASK(53, 53), v));
+		seq_printf(m, "   52 TME0              %lx\n", FIELD_GET(GENMASK(52, 52), v));
+		seq_printf(m, "   51 TMT               %lx\n", FIELD_GET(GENMASK(51, 51), v));
+		seq_printf(m, "   50 TMT0              %lx\n", FIELD_GET(GENMASK(50, 50), v));
+		seq_printf(m, "49:46 TWEDEL            %lx\n", FIELD_GET(GENMASK(49, 46), v));
+		seq_printf(m, "   45 TWEDEn            %lx\n", FIELD_GET(GENMASK(45, 45), v));
+		seq_printf(m, "   44 DSSBS             %lx\n", FIELD_GET(GENMASK(44, 44), v));
+		seq_printf(m, "   43 ATA               %lx\n", FIELD_GET(GENMASK(43, 43), v));
+		seq_printf(m, "   42 ATA0              %lx\n", FIELD_GET(GENMASK(42, 42), v));
+		seq_printf(m, "41:40 TCF               %lx\n", FIELD_GET(GENMASK(41, 40), v));
+		seq_printf(m, "39:38 TCF0              %lx\n", FIELD_GET(GENMASK(39, 38), v));
+		seq_printf(m, "   37 ITFSB             %lx\n", FIELD_GET(GENMASK(37, 37), v));
+		seq_printf(m, "   36 BT1               %lx\n", FIELD_GET(GENMASK(36, 36), v));
+		seq_printf(m, "   35 BT0               %lx\n", FIELD_GET(GENMASK(35, 35), v));
+		seq_printf(m, "   34 Res0              %lx\n", FIELD_GET(GENMASK(34, 34), v));
+		seq_printf(m, "   33 MSCEn             %lx\n", FIELD_GET(GENMASK(33, 33), v));
+		seq_printf(m, "   32 CMOW              %lx\n", FIELD_GET(GENMASK(32, 32), v));
+		seq_printf(m, "   31 EnIA              %lx\n", FIELD_GET(GENMASK(31, 31), v));
+		seq_printf(m, "   30 EnIB              %lx\n", FIELD_GET(GENMASK(30, 30), v));
+		seq_printf(m, "   29 LSMAOE            %lx\n", FIELD_GET(GENMASK(29, 29), v));
+		seq_printf(m, "   28 nTLSMD            %lx\n", FIELD_GET(GENMASK(28, 28), v));
+		seq_printf(m, "   27 EnDA              %lx\n", FIELD_GET(GENMASK(27, 27), v));
+		seq_printf(m, "   26 UCI               %lx\n", FIELD_GET(GENMASK(26, 26), v));
+		seq_printf(m, "   25 EE                %lx\n", FIELD_GET(GENMASK(25, 25), v));
+		seq_printf(m, "   24 EOE               %lx\n", FIELD_GET(GENMASK(24, 24), v));
+		seq_printf(m, "   23 SPAN              %lx\n", FIELD_GET(GENMASK(23, 23), v));
+		seq_printf(m, "   22 EIS               %lx\n", FIELD_GET(GENMASK(22, 22), v));
+		seq_printf(m, "   21 IESB              %lx\n", FIELD_GET(GENMASK(21, 21), v));
+		seq_printf(m, "   20 TSCXT             %lx\n", FIELD_GET(GENMASK(20, 20), v));
+		seq_printf(m, "   19 WXN               %lx\n", FIELD_GET(GENMASK(19, 19), v));
+		seq_printf(m, "   18 nTWE              %lx\n", FIELD_GET(GENMASK(18, 18), v));
+		seq_printf(m, "   17 Res1              %lx\n", FIELD_GET(GENMASK(17, 17), v));
+		seq_printf(m, "   16 nTWI              %lx\n", FIELD_GET(GENMASK(16, 16), v));
+		seq_printf(m, "   15 UCT               %lx\n", FIELD_GET(GENMASK(15, 15), v));
+		seq_printf(m, "   14 DZE               %lx\n", FIELD_GET(GENMASK(14, 14), v));
+		seq_printf(m, "   13 EnDB              %lx\n", FIELD_GET(GENMASK(13, 13), v));
+		seq_printf(m, "   12 I                 %lx\n", FIELD_GET(GENMASK(12, 12), v));
+		seq_printf(m, "   11 EOS               %lx\n", FIELD_GET(GENMASK(11, 11), v));
+		seq_printf(m, "   10 EnRCTX            %lx\n", FIELD_GET(GENMASK(10, 10), v));
+		seq_printf(m, "   09 UMA               %lx\n", FIELD_GET(GENMASK( 9,  9), v));
+		seq_printf(m, "   08 SED               %lx\n", FIELD_GET(GENMASK( 8,  8), v));
+		seq_printf(m, "   07 ITD               %lx\n", FIELD_GET(GENMASK( 7,  7), v));
+		seq_printf(m, "   06 nAA               %lx\n", FIELD_GET(GENMASK( 6,  6), v));
+		seq_printf(m, "   05 CP15BEN           %lx\n", FIELD_GET(GENMASK( 5,  5), v));
+		seq_printf(m, "   04 SA0               %lx\n", FIELD_GET(GENMASK( 4,  4), v));
+		seq_printf(m, "   03 SA                %lx\n", FIELD_GET(GENMASK( 3,  3), v));
+		seq_printf(m, "   02 C                 %lx\n", FIELD_GET(GENMASK( 2,  2), v));
+		seq_printf(m, "   01 A                 %lx\n", FIELD_GET(GENMASK( 1,  1), v));
+		seq_printf(m, "   00 M                 %lx\n", FIELD_GET(GENMASK( 0,  0), v));
+
+		/* VBAR_EL1 */
+		v = read_sysreg_s(SYS_VBAR_EL1);
+		seq_printf(m, "VBAR_EL1:               %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "63:11 Base              %lx\n", FIELD_GET(GENMASK(63, 11), v));
+		seq_printf(m, "10:00 Res0              %lx\n", FIELD_GET(GENMASK(10,  0), v));
+		seq_puts  (m, "\n");
+
+		/* TCR_EL1 */
+		v = read_sysreg_s(SYS_TCR_EL1);
+		seq_printf(m, "TCR_EL1:                %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "63:62 Res0              %lx\n", FIELD_GET(GENMASK(63, 62), v));
+		seq_printf(m, "   61 MTX1              %lx\n", FIELD_GET(GENMASK(61, 61), v));
+		seq_printf(m, "   60 MTX0              %lx\n", FIELD_GET(GENMASK(60, 60), v));
+		seq_printf(m, "   59 DS                %lx\n", FIELD_GET(GENMASK(59, 59), v));
+		seq_printf(m, "   58 TCMA1             %lx\n", FIELD_GET(GENMASK(58, 58), v));
+		seq_printf(m, "   57 TCMA0             %lx\n", FIELD_GET(GENMASK(57, 57), v));
+		seq_printf(m, "   56 E0PD1             %lx\n", FIELD_GET(GENMASK(56, 56), v));
+		seq_printf(m, "   55 E0PD0             %lx\n", FIELD_GET(GENMASK(55, 55), v));
+		seq_printf(m, "   54 NFD1              %lx\n", FIELD_GET(GENMASK(54, 54), v));
+		seq_printf(m, "   53 NFD0              %lx\n", FIELD_GET(GENMASK(53, 53), v));
+		seq_printf(m, "   52 TBID1             %lx\n", FIELD_GET(GENMASK(52, 52), v));
+		seq_printf(m, "   51 TBID0             %lx\n", FIELD_GET(GENMASK(51, 51), v));
+		seq_printf(m, "   50 HWU162            %lx\n", FIELD_GET(GENMASK(50, 50), v));
+		seq_printf(m, "   49 HWU161            %lx\n", FIELD_GET(GENMASK(49, 49), v));
+		seq_printf(m, "   48 HWU160            %lx\n", FIELD_GET(GENMASK(48, 48), v));
+		seq_printf(m, "   47 HWU159            %lx\n", FIELD_GET(GENMASK(47, 47), v));
+		seq_printf(m, "   46 HWU062            %lx\n", FIELD_GET(GENMASK(46, 46), v));
+		seq_printf(m, "   45 HWU061            %lx\n", FIELD_GET(GENMASK(45, 45), v));
+		seq_printf(m, "   44 HWU060            %lx\n", FIELD_GET(GENMASK(44, 44), v));
+		seq_printf(m, "   43 HWU059            %lx\n", FIELD_GET(GENMASK(43, 43), v));
+		seq_printf(m, "   42 HPD1              %lx\n", FIELD_GET(GENMASK(42, 42), v));
+		seq_printf(m, "   41 HDP0              %lx\n", FIELD_GET(GENMASK(41, 41), v));
+		seq_printf(m, "   40 HD                %lx\n", FIELD_GET(GENMASK(40, 40), v));
+		seq_printf(m, "   39 HA                %lx\n", FIELD_GET(GENMASK(39, 39), v));
+		seq_printf(m, "   38 TBI1              %lx\n", FIELD_GET(GENMASK(38, 38), v));
+		seq_printf(m, "   37 TBI0              %lx\n", FIELD_GET(GENMASK(37, 37), v));
+		seq_printf(m, "   36 AS                %lx\n", FIELD_GET(GENMASK(36, 36), v));
+		seq_printf(m, "   35 Res0              %lx\n", FIELD_GET(GENMASK(35, 35), v));
+		seq_printf(m, "34:32 IPS               %lx\n", FIELD_GET(GENMASK(34, 32), v));
+		seq_printf(m, "31:30 TG1               %lx\n", FIELD_GET(GENMASK(31, 30), v));
+		seq_printf(m, "29:28 SH1               %lx\n", FIELD_GET(GENMASK(29, 28), v));
+		seq_printf(m, "27:26 ORGN1             %lx\n", FIELD_GET(GENMASK(27, 26), v));
+		seq_printf(m, "25:24 IRGN1             %lx\n", FIELD_GET(GENMASK(25, 24), v));
+		seq_printf(m, "   23 EPD1              %lx\n", FIELD_GET(GENMASK(23, 23), v));
+		seq_printf(m, "   22 A1                %lx\n", FIELD_GET(GENMASK(22, 22), v));
+		seq_printf(m, "21:16 T1SZ              %lx\n", FIELD_GET(GENMASK(21, 16), v));
+		seq_printf(m, "15:14 TG0               %lx\n", FIELD_GET(GENMASK(15, 14), v));
+		seq_printf(m, "13:12 SH0               %lx\n", FIELD_GET(GENMASK(13, 12), v));
+		seq_printf(m, "11:10 ORGN0             %lx\n", FIELD_GET(GENMASK(11, 10), v));
+		seq_printf(m, "09:08 IRGN0             %lx\n", FIELD_GET(GENMASK( 9,  8), v));
+		seq_printf(m, "   07 EPD0              %lx\n", FIELD_GET(GENMASK( 7,  7), v));
+		seq_printf(m, "   06 Res1              %lx\n", FIELD_GET(GENMASK( 6,  6), v));
+		seq_printf(m, "05:00 T0SZ              %lx\n", FIELD_GET(GENMASK( 5,  0), v));
+		seq_puts  (m, "\n");
+
+		/* TTBR0_EL1 */
+		v = read_sysreg_s(SYS_TTBR0_EL1);
+		seq_printf(m, "TTBR0_EL1:              %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "63:48 ASID              %lx\n", FIELD_GET(GENMASK(63, 48), v));
+		seq_printf(m, "47:01 BADDR[47:1]       %lx\n", FIELD_GET(GENMASK(47,  1), v));
+		seq_printf(m, "   00 CnP               %lx\n", FIELD_GET(GENMASK( 0,  0), v));
+		seq_puts  (m, "\n");
+
+		/* TTBR1_EL1 */
+		v = read_sysreg_s(SYS_TTBR1_EL1);
+		seq_printf(m, "TTBR1_EL1:              %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "63:48 ASID              %lx\n", FIELD_GET(GENMASK(63, 48), v));
+		seq_printf(m, "47:01 BADDR[47:1]       %lx\n", FIELD_GET(GENMASK(47,  1), v));
+		seq_printf(m, "   00 CnP               %lx\n", FIELD_GET(GENMASK( 0,  0), v));
+		seq_puts  (m, "\n");
+	} else {		/* EL2 */
+		/* SCTLR_EL2 */
+		v = read_sysreg_s(SYS_SCTLR_EL2);
+		seq_printf(m, "SCTLR_EL2:              %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "   63 TIDCP             %lx\n", FIELD_GET(GENMASK(63, 63), v));
+		seq_printf(m, "   62 SPINTMASK         %lx\n", FIELD_GET(GENMASK(62, 62), v));
+		seq_printf(m, "   61 NMI               %lx\n", FIELD_GET(GENMASK(61, 61), v));
+		seq_printf(m, "   60 EnTP2             %lx\n", FIELD_GET(GENMASK(60, 60), v));
+		seq_printf(m, "   59 TCSO              %lx\n", FIELD_GET(GENMASK(59, 59), v));
+		seq_printf(m, "   58 TCSO0             %lx\n", FIELD_GET(GENMASK(58, 58), v));
+		seq_printf(m, "   57 EPAN              %lx\n", FIELD_GET(GENMASK(57, 57), v));
+		seq_printf(m, "   56 EnALS             %lx\n", FIELD_GET(GENMASK(56, 56), v));
+		seq_printf(m, "   55 EnAS0             %lx\n", FIELD_GET(GENMASK(55, 55), v));
+		seq_printf(m, "   54 EnASR             %lx\n", FIELD_GET(GENMASK(54, 54), v));
+		seq_printf(m, "   53 TME               %lx\n", FIELD_GET(GENMASK(53, 53), v));
+		seq_printf(m, "   52 TME0              %lx\n", FIELD_GET(GENMASK(52, 52), v));
+		seq_printf(m, "   51 TMT               %lx\n", FIELD_GET(GENMASK(51, 51), v));
+		seq_printf(m, "   50 TMT0              %lx\n", FIELD_GET(GENMASK(50, 50), v));
+		seq_printf(m, "49:46 TWEDEL            %lx\n", FIELD_GET(GENMASK(49, 46), v));
+		seq_printf(m, "   45 TWEDEn            %lx\n", FIELD_GET(GENMASK(45, 45), v));
+		seq_printf(m, "   44 DSSBS             %lx\n", FIELD_GET(GENMASK(44, 44), v));
+		seq_printf(m, "   43 ATA               %lx\n", FIELD_GET(GENMASK(43, 43), v));
+		seq_printf(m, "   42 ATA0              %lx\n", FIELD_GET(GENMASK(42, 42), v));
+		seq_printf(m, "41:40 TCF               %lx\n", FIELD_GET(GENMASK(41, 40), v));
+		seq_printf(m, "39:38 TCF0              %lx\n", FIELD_GET(GENMASK(39, 38), v));
+		seq_printf(m, "   37 ITFSB             %lx\n", FIELD_GET(GENMASK(37, 37), v));
+		seq_printf(m, "   36 BT1               %lx\n", FIELD_GET(GENMASK(36, 36), v));
+		seq_printf(m, "   35 BT0               %lx\n", FIELD_GET(GENMASK(35, 35), v));
+		seq_printf(m, "   34 Res0              %lx\n", FIELD_GET(GENMASK(34, 34), v));
+		seq_printf(m, "   33 MSCEn             %lx\n", FIELD_GET(GENMASK(33, 33), v));
+		seq_printf(m, "   32 CMOW              %lx\n", FIELD_GET(GENMASK(32, 32), v));
+		seq_printf(m, "   31 EnIA              %lx\n", FIELD_GET(GENMASK(31, 31), v));
+		seq_printf(m, "   30 EnIB              %lx\n", FIELD_GET(GENMASK(30, 30), v));
+		seq_printf(m, "   29 LSMAOE            %lx\n", FIELD_GET(GENMASK(29, 29), v));
+		seq_printf(m, "   28 nTLSMD            %lx\n", FIELD_GET(GENMASK(28, 28), v));
+		seq_printf(m, "   27 EnDA              %lx\n", FIELD_GET(GENMASK(27, 27), v));
+		seq_printf(m, "   26 UCI               %lx\n", FIELD_GET(GENMASK(26, 26), v));
+		seq_printf(m, "   25 EE                %lx\n", FIELD_GET(GENMASK(25, 25), v));
+		seq_printf(m, "   24 EOE               %lx\n", FIELD_GET(GENMASK(24, 24), v));
+		seq_printf(m, "   23 SPAN              %lx\n", FIELD_GET(GENMASK(23, 23), v));
+		seq_printf(m, "   22 EIS               %lx\n", FIELD_GET(GENMASK(22, 22), v));
+		seq_printf(m, "   21 IESB              %lx\n", FIELD_GET(GENMASK(21, 21), v));
+		seq_printf(m, "   20 TSCXT             %lx\n", FIELD_GET(GENMASK(20, 20), v));
+		seq_printf(m, "   19 WXN               %lx\n", FIELD_GET(GENMASK(19, 19), v));
+		seq_printf(m, "   18 nTWE              %lx\n", FIELD_GET(GENMASK(18, 18), v));
+		seq_printf(m, "   17 Res1              %lx\n", FIELD_GET(GENMASK(17, 17), v));
+		seq_printf(m, "   16 nTWI              %lx\n", FIELD_GET(GENMASK(16, 16), v));
+		seq_printf(m, "   15 UCT               %lx\n", FIELD_GET(GENMASK(15, 15), v));
+		seq_printf(m, "   14 DZE               %lx\n", FIELD_GET(GENMASK(14, 14), v));
+		seq_printf(m, "   13 EnDB              %lx\n", FIELD_GET(GENMASK(13, 13), v));
+		seq_printf(m, "   12 I                 %lx\n", FIELD_GET(GENMASK(12, 12), v));
+		seq_printf(m, "   11 EOS               %lx\n", FIELD_GET(GENMASK(11, 11), v));
+		seq_printf(m, "   10 EnRCTX            %lx\n", FIELD_GET(GENMASK(10, 10), v));
+		seq_printf(m, "   09 Res2               %lx\n", FIELD_GET(GENMASK( 9,  9), v));
+		seq_printf(m, "   08 SED               %lx\n", FIELD_GET(GENMASK( 8,  8), v));
+		seq_printf(m, "   07 ITD               %lx\n", FIELD_GET(GENMASK( 7,  7), v));
+		seq_printf(m, "   06 nAA               %lx\n", FIELD_GET(GENMASK( 6,  6), v));
+		seq_printf(m, "   05 CP15BEN           %lx\n", FIELD_GET(GENMASK( 5,  5), v));
+		seq_printf(m, "   04 SA0               %lx\n", FIELD_GET(GENMASK( 4,  4), v));
+		seq_printf(m, "   03 SA                %lx\n", FIELD_GET(GENMASK( 3,  3), v));
+		seq_printf(m, "   02 C                 %lx\n", FIELD_GET(GENMASK( 2,  2), v));
+		seq_printf(m, "   01 A                 %lx\n", FIELD_GET(GENMASK( 1,  1), v));
+		seq_printf(m, "   00 M                 %lx\n", FIELD_GET(GENMASK( 0,  0), v));
+		seq_puts  (m, "\n");
+
+		/* HCR_EL2 */
+		v = read_sysreg_s(SYS_HCR_EL2);
+		seq_printf(m, "HCR_EL2:                %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "63:60 TWEDEL            %lx\n", FIELD_GET(GENMASK(63, 60), v));
+		seq_printf(m, "   59 TWEDEn            %lx\n", FIELD_GET(GENMASK(59, 59), v));
+		seq_printf(m, "   58 TID5              %lx\n", FIELD_GET(GENMASK(58, 58), v));
+		seq_printf(m, "   57 DCT               %lx\n", FIELD_GET(GENMASK(57, 57), v));
+		seq_printf(m, "   56 ATA               %lx\n", FIELD_GET(GENMASK(56, 56), v));
+		seq_printf(m, "   55 TTLBOS            %lx\n", FIELD_GET(GENMASK(55, 55), v));
+		seq_printf(m, "   54 TTLBIS            %lx\n", FIELD_GET(GENMASK(54, 54), v));
+		seq_printf(m, "   53 EnSCXT            %lx\n", FIELD_GET(GENMASK(53, 53), v));
+		seq_printf(m, "   52 TOCU              %lx\n", FIELD_GET(GENMASK(52, 52), v));
+		seq_printf(m, "   51 AMVOFFEN          %lx\n", FIELD_GET(GENMASK(51, 51), v));
+		seq_printf(m, "   50 TICAB             %lx\n", FIELD_GET(GENMASK(50, 50), v));
+		seq_printf(m, "   49 TID4              %lx\n", FIELD_GET(GENMASK(49, 49), v));
+		seq_printf(m, "   48 GPF               %lx\n", FIELD_GET(GENMASK(48, 48), v));
+		seq_printf(m, "   47 FIEN              %lx\n", FIELD_GET(GENMASK(47, 47), v));
+		seq_printf(m, "   46 FWB               %lx\n", FIELD_GET(GENMASK(46, 46), v));
+		seq_printf(m, "   45 NV2               %lx\n", FIELD_GET(GENMASK(45, 45), v));
+		seq_printf(m, "   44 AT                %lx\n", FIELD_GET(GENMASK(44, 44), v));
+		seq_printf(m, "   43 NV1               %lx\n", FIELD_GET(GENMASK(43, 43), v));
+		seq_printf(m, "   42 NV                %lx\n", FIELD_GET(GENMASK(42, 42), v));
+		seq_printf(m, "   41 API               %lx\n", FIELD_GET(GENMASK(41, 41), v));
+		seq_printf(m, "   40 APK               %lx\n", FIELD_GET(GENMASK(40, 40), v));
+		seq_printf(m, "   39 TME               %lx\n", FIELD_GET(GENMASK(39, 39), v));
+		seq_printf(m, "   38 MIOCNCE           %lx\n", FIELD_GET(GENMASK(38, 38), v));
+		seq_printf(m, "   37 TEA               %lx\n", FIELD_GET(GENMASK(37, 37), v));
+		seq_printf(m, "   36 TERR              %lx\n", FIELD_GET(GENMASK(36, 36), v));
+		seq_printf(m, "   35 TLOR              %lx\n", FIELD_GET(GENMASK(35, 35), v));
+		seq_printf(m, "   34 E2H               %lx\n", FIELD_GET(GENMASK(34, 34), v));
+		seq_printf(m, "   33 ID                %lx\n", FIELD_GET(GENMASK(33, 33), v));
+		seq_printf(m, "   32 CD                %lx\n", FIELD_GET(GENMASK(32, 32), v));
+		seq_printf(m, "   31 RW                %lx\n", FIELD_GET(GENMASK(31, 31), v));
+		seq_printf(m, "   30 TRVM              %lx\n", FIELD_GET(GENMASK(30, 30), v));
+		seq_printf(m, "   29 HCD               %lx\n", FIELD_GET(GENMASK(29, 29), v));
+		seq_printf(m, "   28 TDZ               %lx\n", FIELD_GET(GENMASK(28, 28), v));
+		seq_printf(m, "   27 TGE               %lx\n", FIELD_GET(GENMASK(27, 27), v));
+		seq_printf(m, "   26 TVM               %lx\n", FIELD_GET(GENMASK(26, 26), v));
+		seq_printf(m, "   25 TTLB              %lx\n", FIELD_GET(GENMASK(25, 25), v));
+		seq_printf(m, "   24 TPU               %lx\n", FIELD_GET(GENMASK(24, 24), v));
+		seq_printf(m, "   23 Res0              %lx\n", FIELD_GET(GENMASK(23, 23), v));
+		seq_printf(m, "   22 TSW               %lx\n", FIELD_GET(GENMASK(22, 22), v));
+		seq_printf(m, "   21 TACR              %lx\n", FIELD_GET(GENMASK(21, 21), v));
+		seq_printf(m, "   20 TIDCP             %lx\n", FIELD_GET(GENMASK(20, 20), v));
+		seq_printf(m, "   19 TSC               %lx\n", FIELD_GET(GENMASK(19, 19), v));
+		seq_printf(m, "   18 TID3              %lx\n", FIELD_GET(GENMASK(18, 18), v));
+		seq_printf(m, "   17 TID2              %lx\n", FIELD_GET(GENMASK(17, 17), v));
+		seq_printf(m, "   16 TID1              %lx\n", FIELD_GET(GENMASK(16, 16), v));
+		seq_printf(m, "   15 TID0              %lx\n", FIELD_GET(GENMASK(15, 15), v));
+		seq_printf(m, "   14 TWE               %lx\n", FIELD_GET(GENMASK(14, 14), v));
+		seq_printf(m, "   13 TWI               %lx\n", FIELD_GET(GENMASK(13, 13), v));
+		seq_printf(m, "   12 DC                %lx\n", FIELD_GET(GENMASK(12, 12), v));
+		seq_printf(m, "11:10 BSU               %lx\n", FIELD_GET(GENMASK(11, 10), v));
+		seq_printf(m, "   09 FB                %lx\n", FIELD_GET(GENMASK( 9,  9), v));
+		seq_printf(m, "   08 VSE               %lx\n", FIELD_GET(GENMASK( 8,  8), v));
+		seq_printf(m, "   07 VI                %lx\n", FIELD_GET(GENMASK( 7,  7), v));
+		seq_printf(m, "   06 VF                %lx\n", FIELD_GET(GENMASK( 6,  6), v));
+		seq_printf(m, "   05 AMO               %lx\n", FIELD_GET(GENMASK( 5,  5), v));
+		seq_printf(m, "   04 IMO               %lx\n", FIELD_GET(GENMASK( 4,  4), v));
+		seq_printf(m, "   03 FMO               %lx\n", FIELD_GET(GENMASK( 3,  3), v));
+		seq_printf(m, "   02 PTW               %lx\n", FIELD_GET(GENMASK( 2,  2), v));
+		seq_printf(m, "   01 SWIO              %lx\n", FIELD_GET(GENMASK( 1,  1), v));
+		seq_printf(m, "   00 VM                %lx\n", FIELD_GET(GENMASK( 0,  0), v));
+		seq_puts  (m, "\n");
+
+		/* VBAR_EL2 */
+		v = read_sysreg_s(SYS_VBAR_EL2);
+		seq_printf(m, "VBAR_EL2:               %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "63:11 Base              %lx\n", FIELD_GET(GENMASK(63, 11), v));
+		seq_printf(m, "10:00 Res0              %lx\n", FIELD_GET(GENMASK(10,  0), v));
+		seq_puts  (m, "\n");
+
+		/* TCR_EL2 */
+		v = read_sysreg_s(SYS_TCR_EL2);
+		seq_printf(m, "TCR_EL2:                %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "63:62 Res0              %lx\n", FIELD_GET(GENMASK(63, 62), v));
+		seq_printf(m, "   61 MTX1              %lx\n", FIELD_GET(GENMASK(61, 61), v));
+		seq_printf(m, "   60 MTX0              %lx\n", FIELD_GET(GENMASK(60, 60), v));
+		seq_printf(m, "   59 DS                %lx\n", FIELD_GET(GENMASK(59, 59), v));
+		seq_printf(m, "   58 TCMA1             %lx\n", FIELD_GET(GENMASK(58, 58), v));
+		seq_printf(m, "   57 TCMA0             %lx\n", FIELD_GET(GENMASK(57, 57), v));
+		seq_printf(m, "   56 E0PD1             %lx\n", FIELD_GET(GENMASK(56, 56), v));
+		seq_printf(m, "   55 E0PD0             %lx\n", FIELD_GET(GENMASK(55, 55), v));
+		seq_printf(m, "   54 NFD1              %lx\n", FIELD_GET(GENMASK(54, 54), v));
+		seq_printf(m, "   53 NFD0              %lx\n", FIELD_GET(GENMASK(53, 53), v));
+		seq_printf(m, "   52 TBID1             %lx\n", FIELD_GET(GENMASK(52, 52), v));
+		seq_printf(m, "   51 TBID0             %lx\n", FIELD_GET(GENMASK(51, 51), v));
+		seq_printf(m, "   50 HWU162            %lx\n", FIELD_GET(GENMASK(50, 50), v));
+		seq_printf(m, "   49 HWU161            %lx\n", FIELD_GET(GENMASK(49, 49), v));
+		seq_printf(m, "   48 HWU160            %lx\n", FIELD_GET(GENMASK(48, 48), v));
+		seq_printf(m, "   47 HWU159            %lx\n", FIELD_GET(GENMASK(47, 47), v));
+		seq_printf(m, "   46 HWU062            %lx\n", FIELD_GET(GENMASK(46, 46), v));
+		seq_printf(m, "   45 HWU061            %lx\n", FIELD_GET(GENMASK(45, 45), v));
+		seq_printf(m, "   44 HWU060            %lx\n", FIELD_GET(GENMASK(44, 44), v));
+		seq_printf(m, "   43 HWU059            %lx\n", FIELD_GET(GENMASK(43, 43), v));
+		seq_printf(m, "   42 HPD1              %lx\n", FIELD_GET(GENMASK(42, 42), v));
+		seq_printf(m, "   41 HDP0              %lx\n", FIELD_GET(GENMASK(41, 41), v));
+		seq_printf(m, "   40 HD                %lx\n", FIELD_GET(GENMASK(40, 40), v));
+		seq_printf(m, "   39 HA                %lx\n", FIELD_GET(GENMASK(39, 39), v));
+		seq_printf(m, "   38 TBI1              %lx\n", FIELD_GET(GENMASK(38, 38), v));
+		seq_printf(m, "   37 TBI0              %lx\n", FIELD_GET(GENMASK(37, 37), v));
+		seq_printf(m, "   36 AS                %lx\n", FIELD_GET(GENMASK(36, 36), v));
+		seq_printf(m, "   35 Res0              %lx\n", FIELD_GET(GENMASK(35, 35), v));
+		seq_printf(m, "34:32 IPS               %lx\n", FIELD_GET(GENMASK(34, 32), v));
+		seq_printf(m, "31:30 TG1               %lx\n", FIELD_GET(GENMASK(31, 30), v));
+		seq_printf(m, "29:28 SH1               %lx\n", FIELD_GET(GENMASK(29, 28), v));
+		seq_printf(m, "27:26 ORGN1             %lx\n", FIELD_GET(GENMASK(27, 26), v));
+		seq_printf(m, "25:24 IRGN1             %lx\n", FIELD_GET(GENMASK(25, 24), v));
+		seq_printf(m, "   23 EPD1              %lx\n", FIELD_GET(GENMASK(23, 23), v));
+		seq_printf(m, "   22 A1                %lx\n", FIELD_GET(GENMASK(22, 22), v));
+		seq_printf(m, "21:16 T1SZ              %lx\n", FIELD_GET(GENMASK(21, 16), v));
+		seq_printf(m, "15:14 TG0               %lx\n", FIELD_GET(GENMASK(15, 14), v));
+		seq_printf(m, "13:12 SH0               %lx\n", FIELD_GET(GENMASK(13, 12), v));
+		seq_printf(m, "11:10 ORGN0             %lx\n", FIELD_GET(GENMASK(11, 10), v));
+		seq_printf(m, "09:08 IRGN0             %lx\n", FIELD_GET(GENMASK( 9,  8), v));
+		seq_printf(m, "   07 EPD0              %lx\n", FIELD_GET(GENMASK( 7,  7), v));
+		seq_printf(m, "   06 Res1              %lx\n", FIELD_GET(GENMASK( 6,  6), v));
+		seq_printf(m, "05:00 T0SZ              %lx\n", FIELD_GET(GENMASK( 5,  0), v));
+		seq_puts  (m, "\n");
+
+		/* TTBR0_EL2 */
+		v = read_sysreg_s(SYS_TTBR0_EL2);
+		seq_printf(m, "TTBR0_EL2:              %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "63:48 ASID              %lx\n", FIELD_GET(GENMASK(63, 48), v));
+		seq_printf(m, "47:01 BADDR[47:1]       %lx\n", FIELD_GET(GENMASK(47,  1), v));
+		seq_printf(m, "   00 CnP               %lx\n", FIELD_GET(GENMASK( 0,  0), v));
+		seq_puts  (m, "\n");
+
+		/* TTBR1_EL2 */
+		v = read_sysreg_s(SYS_TTBR1_EL2);
+		seq_printf(m, "TTBR1_EL2:              %08x_%08x\n",
+			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
+		seq_puts  (m, "----------------------------------------------\n");
+		seq_printf(m, "63:48 ASID              %lx\n", FIELD_GET(GENMASK(63, 48), v));
+		seq_printf(m, "47:01 BADDR[47:1]       %lx\n", FIELD_GET(GENMASK(47,  1), v));
+		seq_printf(m, "   00 CnP               %lx\n", FIELD_GET(GENMASK( 0,  0), v));
+		seq_puts  (m, "\n");
+
+	}
 }
 
 /*
@@ -73,7 +458,7 @@ static void dump_show_help(struct seq_file *m)
 #define SYS_ID_AA64MMFR4_EL1	sys_reg(3, 0, 0, 7, 4)
 #endif
 
-static void dump_show_register(struct seq_file *m)
+static void dump_show_feature_register(struct seq_file *m)
 {
 	unsigned long v;
 
@@ -457,7 +842,7 @@ static void dump_show_register(struct seq_file *m)
 	seq_puts  (m, "\n");
 }
 
-static void dump_show_register_cache(struct seq_file *m)
+static void dump_show_cache_register(struct seq_file *m)
 {
 	unsigned long val, val1;
 	unsigned int type, i;
@@ -559,7 +944,7 @@ static void dump_show_register_cache(struct seq_file *m)
 #define SYS_ID_MPAMVPM7_EL2	sys_reg(3, 4, 10, 6, 7)
 #define SYS_ID_MPAMVPMV_EL2	sys_reg(3, 4, 10, 4, 1)
 
-static void dump_show_register_mpam(struct seq_file *m)
+static void dump_show_mpam_register(struct seq_file *m)
 {
 	unsigned long major_version, minor_version, v;
 	bool has_sme;
@@ -857,9 +1242,6 @@ static void dump_show_mm(struct seq_file *m)
 	seq_puts(m, "-------------------- mm_struct --------------------\n");
 	seq_printf(m, "mm_count:                %d\n",    atomic_read(&mm->mm_count));
 	seq_puts(  m, "mm_mt:                   -\n");
-#ifdef CONFIG_MMU
-	seq_printf(m, "get_unmapped_area:       0x%p\n",  mm->get_unmapped_area);
-#endif
 	seq_printf(m, "mmap_base:               0x%lx\n", mm->mmap_base);
 	seq_printf(m, "mmap_legacy_base:        0x%lx\n", mm->mmap_legacy_base);
 #ifdef CONFIG_HAVE_ARCH_COMPAT_MMAP_BASES
@@ -981,11 +1363,14 @@ static int dump_show(struct seq_file *m, void *v)
 	case DUMP_OPT_REGISTER:
 		dump_show_register(m);
 		break;
-	case DUMP_OPT_REGISTER_CACHE:
-		dump_show_register_cache(m);
+	case DUMP_OPT_FEATURE_REGISTER:
+		dump_show_feature_register(m);
 		break;
-	case DUMP_OPT_REGISTER_MPAM:
-		dump_show_register_mpam(m);
+	case DUMP_OPT_CACHE_REGISTER:
+		dump_show_cache_register(m);
+		break;
+	case DUMP_OPT_MPAM_REGISTER:
+		dump_show_mpam_register(m);
 		break;
 	case DUMP_OPT_PROCESS:
 		dump_show_process(m);
