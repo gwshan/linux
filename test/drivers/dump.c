@@ -927,22 +927,22 @@ static void dump_show_cache_register(struct seq_file *m)
 	seq_puts(m, "\n");
 }
 
-#define SYS_ID_MPAM0_EL1	sys_reg(3, 0, 10, 5, 1)
-#define SYS_ID_MPAM1_EL1	sys_reg(3, 0, 10, 5, 0)
-#define SYS_ID_MPAM2_EL2	sys_reg(3, 4, 10, 5, 0)
-#define SYS_ID_MPAM3_EL3	sys_reg(3, 6, 10, 5, 0)
-#define SYS_ID_MPAMHCR_EL2	sys_reg(3, 4, 10, 4, 0)
-#define SYS_ID_MAPMIDR_EL1	sys_reg(3, 0, 10, 4, 4)
-#define SYS_ID_MPAMSM_EL1	sys_reg(3, 0, 10, 5, 3)
-#define SYS_ID_MPAMVPM0_EL2	sys_reg(3, 4, 10, 6, 0)
-#define SYS_ID_MPAMVPM1_EL2	sys_reg(3, 4, 10, 6, 1)
-#define SYS_ID_MPAMVPM2_EL2	sys_reg(3, 4, 10, 6, 2)
-#define SYS_ID_MPAMVPM3_EL2	sys_reg(3, 4, 10, 6, 3)
-#define SYS_ID_MPAMVPM4_EL2	sys_reg(3, 4, 10, 6, 4)
-#define SYS_ID_MPAMVPM5_EL2	sys_reg(3, 4, 10, 6, 5)
-#define SYS_ID_MPAMVPM6_EL2	sys_reg(3, 4, 10, 6, 6)
-#define SYS_ID_MPAMVPM7_EL2	sys_reg(3, 4, 10, 6, 7)
-#define SYS_ID_MPAMVPMV_EL2	sys_reg(3, 4, 10, 4, 1)
+#define SYS_MPAM0_EL1		sys_reg(3, 0, 10, 5, 1)
+#define SYS_MPAM1_EL1		sys_reg(3, 0, 10, 5, 0)
+#define SYS_MPAM2_EL2		sys_reg(3, 4, 10, 5, 0)
+#define SYS_MPAM3_EL3		sys_reg(3, 6, 10, 5, 0)
+#define SYS_MPAMHCR_EL2		sys_reg(3, 4, 10, 4, 0)
+#define SYS_MAPMIDR_EL1		sys_reg(3, 0, 10, 4, 4)
+#define SYS_MPAMSM_EL1		sys_reg(3, 0, 10, 5, 3)
+#define SYS_MPAMVPM0_EL2	sys_reg(3, 4, 10, 6, 0)
+#define SYS_MPAMVPM1_EL2	sys_reg(3, 4, 10, 6, 1)
+#define SYS_MPAMVPM2_EL2	sys_reg(3, 4, 10, 6, 2)
+#define SYS_MPAMVPM3_EL2	sys_reg(3, 4, 10, 6, 3)
+#define SYS_MPAMVPM4_EL2	sys_reg(3, 4, 10, 6, 4)
+#define SYS_MPAMVPM5_EL2	sys_reg(3, 4, 10, 6, 5)
+#define SYS_MPAMVPM6_EL2	sys_reg(3, 4, 10, 6, 6)
+#define SYS_MPAMVPM7_EL2	sys_reg(3, 4, 10, 6, 7)
+#define SYS_MPAMVPMV_EL2	sys_reg(3, 4, 10, 4, 1)
 
 static void dump_show_mpam_register(struct seq_file *m)
 {
@@ -965,9 +965,9 @@ static void dump_show_mpam_register(struct seq_file *m)
 		   major_version, minor_version, has_sme ? "supported" : "unsupported");
 	seq_puts  (m, "\n");
 
-	/* ID_MPAM0_EL1  3 0 10 5 1: MPAM0 Register (EL1) */
-	v = read_sysreg_s(SYS_ID_MPAM0_EL1);
-	seq_printf(m, "ID_MPAM0_EL1:           %08x_%08x\n",
+	/* MPAM0_EL1  3 0 10 5 1: MPAM0 Register (EL1) */
+	v = read_sysreg_s(SYS_MPAM0_EL1);
+	seq_printf(m, "MPAM0_EL1:              %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:48 Res0              %lx\n", FIELD_GET(GENMASK(63, 48), v));
@@ -977,9 +977,9 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PARTID_I          %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	/* ID_MPAM1_EL1  3 0 10 5 0: MPAM1 Register (EL1) */
-	v = read_sysreg_s(SYS_ID_MPAM1_EL1);
-	seq_printf(m, "ID_MPAM1_EL1:           %08x_%08x\n",
+	/* MPAM1_EL1  3 0 10 5 0: MPAM1 Register (EL1) */
+	v = read_sysreg_s(SYS_MPAM1_EL1);
+	seq_printf(m, "MPAM1_EL1:              %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "   63 MPAMEN            %lx\n", FIELD_GET(GENMASK(63, 63), v));
@@ -994,9 +994,9 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PARTID_I          %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	/* ID_MPAM2_EL1  3 4 10 5 0: MPAM2 Register (EL2) */
-	v = read_sysreg_s(SYS_ID_MPAM2_EL2);
-	seq_printf(m, "ID_MPAM2_EL1:           %08x_%08x\n",
+	/* MPAM2_EL1  3 4 10 5 0: MPAM2 Register (EL2) */
+	v = read_sysreg_s(SYS_MPAM2_EL2);
+	seq_printf(m, "MPAM2_EL2:              %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "   63 MPAMEN            %lx\n", FIELD_GET(GENMASK(63, 63), v));
@@ -1016,10 +1016,10 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PARTID_I          %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	/* ID_MPAM3_EL3  3 6 10 5 0: MPAM3 Regiter (EL3) */
-	/* ID_MPAMHCR_EL2  3 4 10 4 0: MPAM Hypervisor Control Register (EL2) */
-	v = read_sysreg_s(SYS_ID_MPAMHCR_EL2);
-	seq_printf(m, "ID_MPAMHCR_EL2:         %08x_%08x\n",
+	/* MPAM3_EL3  3 6 10 5 0: MPAM3 Regiter (EL3) */
+	/* MPAMHCR_EL2  3 4 10 4 0: MPAM Hypervisor Control Register (EL2) */
+	v = read_sysreg_s(SYS_MPAMHCR_EL2);
+	seq_printf(m, "MPAMHCR_EL2:            %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:32 Res0              %lx\n", FIELD_GET(GENMASK(63, 32), v));
@@ -1031,9 +1031,9 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "   00 EL0_VPMEN         %lx\n", FIELD_GET(GENMASK( 0,  0), v));
 	seq_puts  (m, "\n");
 
-	/* ID_MAPMIDR_EL1  3 0 10 4 4: MPAM ID Register (EL1) */
-	v = read_sysreg_s(SYS_ID_MAPMIDR_EL1);
-	seq_printf(m, "ID_MAPMIDR_EL1:         %08x_%08x\n",
+	/* MAPMIDR_EL1  3 0 10 4 4: MPAM ID Register (EL1) */
+	v = read_sysreg_s(SYS_MAPMIDR_EL1);
+	seq_printf(m, "MAPMIDR_EL1:            %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:62 Res0              %lx\n", FIELD_GET(GENMASK(63, 62), v));
@@ -1056,8 +1056,8 @@ static void dump_show_mpam_register(struct seq_file *m)
 	 * Access to the register has undefined behavior if SME isn't supported
 	 */
 	if (has_sme) {
-		v = read_sysreg_s(SYS_ID_MPAMSM_EL1);
-		seq_printf(m, "ID_MPAMSM_EL1:         %08x_%08x\n",
+		v = read_sysreg_s(SYS_MPAMSM_EL1);
+		seq_printf(m, "MPAMSM_EL1:            %08x_%08x\n",
 			   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 		seq_puts  (m, "----------------------------------------------\n");
 		seq_printf(m, "63:48 Res0              %lx\n", FIELD_GET(GENMASK(63, 48), v));
@@ -1069,18 +1069,18 @@ static void dump_show_mpam_register(struct seq_file *m)
 	}
 
 	/*
-	 * ID_MPAMVPM0_EL2  3 4 10 6 0: MPAM Virtual PARTID Mapping Register 0
-	 * ID_MPAMVPM1_EL2  3 4 10 6 1: MPAM Virtual PARTID Mapping Register 1
-	 * ID_MPAMVPM2_EL2  3 4 10 6 2: MPAM Virtual PARTID Mapping Register 2
-	 * ID_MPAMVPM3_EL2  3 4 10 6 3: MPAM Virtual PARTID Mapping Register 3
-         * ID_MPAMVPM4_EL2  3 4 10 6 4: MPAM Virtual PARTID Mapping Register 4
-         * ID_MPAMVPM5_EL2  3 4 10 6 5: MPAM Virtual PARTID Mapping Register 5
-	 * ID_MPAMVPM6_EL2  3 4 10 6 6: MPAM Virtual PARTID Mapping Register 6
-         * ID_MPAMVPM7_EL2  3 4 10 6 7: MPAM Virtual PARTID Mapping Register 7
-         * ID_MPAMVPMV_EL2  3 4 10 4 1: MPAM Virtual PARTID Mapping Valid Register
+	 * MPAMVPM0_EL2  3 4 10 6 0: MPAM Virtual PARTID Mapping Register 0
+	 * MPAMVPM1_EL2  3 4 10 6 1: MPAM Virtual PARTID Mapping Register 1
+	 * MPAMVPM2_EL2  3 4 10 6 2: MPAM Virtual PARTID Mapping Register 2
+	 * MPAMVPM3_EL2  3 4 10 6 3: MPAM Virtual PARTID Mapping Register 3
+         * MPAMVPM4_EL2  3 4 10 6 4: MPAM Virtual PARTID Mapping Register 4
+         * MPAMVPM5_EL2  3 4 10 6 5: MPAM Virtual PARTID Mapping Register 5
+	 * MPAMVPM6_EL2  3 4 10 6 6: MPAM Virtual PARTID Mapping Register 6
+         * MPAMVPM7_EL2  3 4 10 6 7: MPAM Virtual PARTID Mapping Register 7
+         * MPAMVPMV_EL2  3 4 10 4 1: MPAM Virtual PARTID Mapping Valid Register
 	 */
-	v = read_sysreg_s(SYS_ID_MPAMVPM7_EL2);
-	seq_printf(m, "ID_MPAMVPM7_EL2:        %08x_%08x\n",
+	v = read_sysreg_s(SYS_MPAMVPM7_EL2);
+	seq_printf(m, "MPAMVPM7_EL2:           %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:48 PhyPARTID31       %lx\n", FIELD_GET(GENMASK(63, 48), v));
@@ -1089,8 +1089,8 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PhyPARTID28       %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	v = read_sysreg_s(SYS_ID_MPAMVPM6_EL2);
-	seq_printf(m, "ID_MPAMVPM6_EL2:        %08x_%08x\n",
+	v = read_sysreg_s(SYS_MPAMVPM6_EL2);
+	seq_printf(m, "MPAMVPM6_EL2:           %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:48 PhyPARTID27       %lx\n", FIELD_GET(GENMASK(63, 48), v));
@@ -1099,8 +1099,8 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PhyPARTID24       %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	v = read_sysreg_s(SYS_ID_MPAMVPM5_EL2);
-	seq_printf(m, "ID_MPAMVPM5_EL2:        %08x_%08x\n",
+	v = read_sysreg_s(SYS_MPAMVPM5_EL2);
+	seq_printf(m, "MPAMVPM5_EL2:           %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:48 PhyPARTID23       %lx\n", FIELD_GET(GENMASK(63, 48), v));
@@ -1109,8 +1109,8 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PhyPARTID20       %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	v = read_sysreg_s(SYS_ID_MPAMVPM4_EL2);
-	seq_printf(m, "ID_MPAMVPM4_EL2:        %08x_%08x\n",
+	v = read_sysreg_s(SYS_MPAMVPM4_EL2);
+	seq_printf(m, "MPAMVPM4_EL2:           %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:48 PhyPARTID19       %lx\n", FIELD_GET(GENMASK(63, 48), v));
@@ -1119,8 +1119,8 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PhyPARTID16       %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	v = read_sysreg_s(SYS_ID_MPAMVPM3_EL2);
-	seq_printf(m, "ID_MPAMVPM3_EL2:        %08x_%08x\n",
+	v = read_sysreg_s(SYS_MPAMVPM3_EL2);
+	seq_printf(m, "MPAMVPM3_EL2:           %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:48 PhyPARTID15       %lx\n", FIELD_GET(GENMASK(63, 48), v));
@@ -1129,8 +1129,8 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PhyPARTID12       %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	v = read_sysreg_s(SYS_ID_MPAMVPM2_EL2);
-	seq_printf(m, "ID_MPAMVPM7_EL2:        %08x_%08x\n",
+	v = read_sysreg_s(SYS_MPAMVPM2_EL2);
+	seq_printf(m, "MPAMVPM7_EL2:           %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:48 PhyPARTID11       %lx\n", FIELD_GET(GENMASK(63, 48), v));
@@ -1139,8 +1139,8 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PhyPARTID08       %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	v = read_sysreg_s(SYS_ID_MPAMVPM1_EL2);
-	seq_printf(m, "ID_MPAMVPM1_EL2:        %08x_%08x\n",
+	v = read_sysreg_s(SYS_MPAMVPM1_EL2);
+	seq_printf(m, "MPAMVPM1_EL2:           %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:48 PhyPARTID07       %lx\n", FIELD_GET(GENMASK(63, 48), v));
@@ -1149,8 +1149,8 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PhyPARTID04       %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	v = read_sysreg_s(SYS_ID_MPAMVPM0_EL2);
-	seq_printf(m, "ID_MPAMVPM0_EL2:        %08x_%08x\n",
+	v = read_sysreg_s(SYS_MPAMVPM0_EL2);
+	seq_printf(m, "MPAMVPM0_EL2:           %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:48 PhyPARTID03       %lx\n", FIELD_GET(GENMASK(63, 48), v));
@@ -1159,8 +1159,8 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "15:00 PhyPARTID00       %lx\n", FIELD_GET(GENMASK(15,  0), v));
 	seq_puts  (m, "\n");
 
-	v = read_sysreg_s(SYS_ID_MPAMVPMV_EL2);
-	seq_printf(m, "ID_MPAMVPMV_EL2:        %08x_%08x\n",
+	v = read_sysreg_s(SYS_MPAMVPMV_EL2);
+	seq_printf(m, "MPAMVPMV_EL2:           %08x_%08x\n",
 		   (unsigned int)(v >> 32), (unsigned int)(v & 0xffffffff));
 	seq_puts  (m, "----------------------------------------------\n");
 	seq_printf(m, "63:32 Res0              %lx\n", FIELD_GET(GENMASK(63, 48), v));
