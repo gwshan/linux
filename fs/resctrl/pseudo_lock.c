@@ -30,7 +30,7 @@
 #include "internal.h"
 
 #define CREATE_TRACE_POINTS
-#include "trace.h"
+// #include "trace.h"
 
 /*
  * Major number assigned to and shared by all devices exposing
