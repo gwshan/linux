@@ -22,7 +22,7 @@
 #include <linux/slab.h>
 
 #include "internal.h"
-#include "trace.h"
+// #include "trace.h"
 
 /**
  * struct rmid_entry - dirty tracking for all RMID.
@@ -170,7 +170,7 @@ void __check_limbo(struct rdt_domain *d, bool force_free)
 			 * CLOSID and RMID because there may be dependencies between them
 			 * on some architectures.
 			 */
-			trace_mon_llc_occupancy_limbo(entry->closid, entry->rmid, d->id, val);
+			// trace_mon_llc_occupancy_limbo(entry->closid, entry->rmid, d->id, val);
 		}
 
 		if (force_free || !rmid_dirty) {
