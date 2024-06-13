@@ -45,6 +45,10 @@ static int __init smccc_soc_init(void)
 	if (soc_id_version == SMCCC_RET_NOT_SUPPORTED) {
 		pr_info("ARCH_SOC_ID not implemented, skipping ....\n");
 		return 0;
+	} else {
+		pr_info("=====> smccc_soc_init\n");
+		pr_info("%s: 0x%08x returned from arm_smccc_get_soc_id_version()\n",
+			__func__, soc_id_version);
 	}
 
 	if (soc_id_version < 0) {

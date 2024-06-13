@@ -675,24 +675,32 @@ static void mpam_enable_quirk_nvidia_t241(struct mpam_msc *msc,
 	struct resource *r;
 	phys_addr_t phys;
 
+	pr_info("=====> mpam_enable_quirk_nvidia_t241\n");
+
 	/*
 	 * A mapping to a device other than the MSC is needed, check
 	 * SOC_ID is  NVIDIA T241 chip (036b:0241)
 	 */
-	if ((soc_id < 0) || (soc_id != SMCCC_SOC_ID_T241))
+	if ((soc_id < 0) || (soc_id != SMCCC_SOC_ID_T241)) {
+		pr_info("%s: mismatched soc_id 0x%08x\n", __func__, soc_id);
 		return;
+	}
 
 	r = platform_get_resource(msc->pdev, IORESOURCE_MEM, 0);
-	if (!r)
+	if (!r) {
+		pr_info("%s: Unable to find IORESOURCE_MEM resource\n", __func__);
 		return;
+	}
 
 	/* Find the internal registers base addr from the CHIP ID */
 	msc->t241_id = T241_CHIP_ID(r->start);
 	phys = FIELD_PREP(GENMASK_ULL(45, 44), msc->t241_id) | 0x19000000ULL;
 
 	t241_scratch_regs[msc->t241_id] = ioremap(phys, SZ_8M);
-	if (WARN_ON_ONCE(!t241_scratch_regs[msc->t241_id]))
+	if (WARN_ON_ONCE(!t241_scratch_regs[msc->t241_id])) {
+		pr_info("%s: Failed to call ioremap()\n", __func__);
 		return;
+	}
 
 	mpam_set_quirk(quirk->workaround, msc);
 	pr_info_once("Enabled workaround for NVIDIA T241 erratum T241-MPAM-1\n");
@@ -719,10 +727,14 @@ static void mpam_enable_quirks(struct mpam_msc *msc)
 {
 	const struct mpam_quirk *quirk;
 
+	pr_info("=====> mpam_enable_quirks\n");
+	pr_info("%s: msc->iidr=0x%08x\n", __func__, msc->iidr);
+
 	for (quirk = &mpam_quirks[0]; quirk->iidr_mask; quirk++) {
 		if (quirk->iidr != (msc->iidr & quirk->iidr_mask))
 			continue;
 
+		pr_info("%s: To apply workaround %d\n", __func__, quirk->workaround);
 		if (quirk->init)
 			quirk->init(msc, quirk);
 		else
