@@ -17,10 +17,20 @@
 #define DRIVER_AUTHOR	"Gavin Shan, Redhat Inc"
 #define DRIVER_DESC	"Export Memory for Read/Write"
 
+/*
+ * The reserved memory size is 256MB, expected to be larger than
+ * two times of LLC size. It means LLC size shouldn't exceed 128MB.
+ * Otherwise, this size should be enlarged accordingly.
+ */
+#define TEST_CACHE_MEM_SIZE	0x10000000
+
 struct test_cache {
 	struct mutex	mutex;
 	bool		opened;
+	bool		contig_pages;
 	int		nid;
+	int		nr_pages;
+	struct page	*page;
 };
 
 static struct test_cache *test;
@@ -43,21 +53,18 @@ static int test_cache_open(struct inode *inode, struct file *filp)
 static vm_fault_t test_cache_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
-	struct page *page = NULL;
 	unsigned long addr = vma->vm_start;
-	unsigned long size = ALIGN(vma->vm_end - vma->vm_start, PAGE_SIZE);
+	unsigned long size = vma->vm_end - vma->vm_start;
 	pteval_t prot = pgprot_val(vma->vm_page_prot);
 	int ret;
 
-	/* Allocate physical memory */
-	page = alloc_pages_node(test->nid,
-				GFP_HIGHUSER_MOVABLE, ilog2(size) - PAGE_SHIFT);
-	if (!page)
-		return VM_FAULT_OOM;
-
-	ret = remap_pfn_range(vma, addr, page_to_pfn(page), size, __pgprot(prot));
-	if (ret)
+	ret = remap_pfn_range(vma, addr, page_to_pfn(test->page),
+			      size, __pgprot(prot));
+	if (ret) {
+		pr_warn("%s: Error %d from remap_pfn_range()\n",
+			__func__, ret);
 		return VM_FAULT_SIGSEGV;
+	}
 
 	return VM_FAULT_NOPAGE;
 }
@@ -68,18 +75,23 @@ static const struct vm_operations_struct test_cache_vm_ops = {
 
 static int test_cache_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-	unsigned long size = ALIGN(vma->vm_end - vma->vm_start, PAGE_SIZE);
-	unsigned long max_size = PAGE_SIZE * (1 << MAX_ORDER);
+	unsigned long size = vma->vm_end - vma->vm_start;
 
-	if (size > max_size) {
-		pr_warn("%s: Mapped size 0x%lx exceeds the allowed size 0x%lx\n",
-			__func__, size, max_size);
-		return -ERANGE;
+	if (!IS_ALIGNED(vma->vm_start, PAGE_SIZE)) {
+		pr_warn("%s: start address 0x%lx isn't PAGE_SIZE aligned\n",
+			__func__, vma->vm_start);
+		return -EINVAL;
 	}
 
-	if (!IS_ALIGNED(vma->vm_start, PAGE_SIZE) || !IS_ALIGNED(size, size)) {
-		pr_warn("%s: vma range (0x%lx, 0x%lx) not aligned\n",
-			__func__, vma->vm_start, size);
+	if (!IS_ALIGNED(size, size)) {
+		pr_warn("%s: address range (0x%lx 0x%lx) isn't properly aligned\n",
+			__func__, vma->vm_start, vma->vm_end);
+		return -EINVAL;
+	}
+
+	if (size > (test->nr_pages << PAGE_SHIFT)) {
+		pr_warn("%s: address range size 0x%lx exceeds limit 0x%lx\n",
+			__func__, size, ((unsigned long)(test->nr_pages) << PAGE_SHIFT));
 		return -EINVAL;
 	}
 
@@ -123,32 +135,56 @@ static int __init test_cache_init(void)
 		return -ENOMEM;
 	}
 
-	/*
-	 * The preferred node may be offline. In this case, we fall
-	 * back to node-0, which is always online.
-	 */
+	/* Initialize test struct */
 	mutex_init(&test->mutex);
 	test->opened = false;
-	if (nid < MAX_NUMNODES && node_online(nid)) {
-		test->nid = nid;
+	test->nid = (nid < MAX_NUMNODES && node_online(nid)) ? nid : 0;
+	test->nr_pages = TEST_CACHE_MEM_SIZE / PAGE_SIZE;
+	test->page = NULL;
+	test->contig_pages = (test->nr_pages > MAX_ORDER_NR_PAGES) ? true : false;
+
+	/* Allocate memory */
+	if (test->contig_pages) {
+		test->page = alloc_contig_pages(test->nr_pages,
+						GFP_KERNEL | __GFP_THISNODE | __GFP_NOWARN,
+						test->nid, NULL);
 	} else {
-		pr_info("%s: Invalid or offline node %d, fall back to nid 0\n",
-			__func__, nid);
-		test->nid = 0;
+		test->page = alloc_pages_node(test->nid, GFP_HIGHUSER_MOVABLE,
+					      ilog2(test->nr_pages));
+	}
+
+	if (!test->page) {
+		pr_warn("%s: Unable to alloc memory\n", __func__);
+		goto free_test_struct;
 	}
 
 	ret = misc_register(&test_cache_dev);
 	if (ret) {
 		pr_warn("%s: Error %d to register device\n", __func__, ret);
-		kfree(test);
+		goto free_pages;
 	}
 
+	return 0;
+
+free_pages:
+	if (test->contig_pages)
+		free_contig_range(page_to_pfn(test->page), test->nr_pages);
+	else
+		__free_pages(test->page, ilog2(test->nr_pages));
+free_test_struct:
+	kfree(test);
 	return ret;
 }
 
 static void __exit test_cache_exit(void)
 {
 	misc_deregister(&test_cache_dev);
+
+	if (test->contig_pages)
+		free_contig_range(page_to_pfn(test->page), test->nr_pages);
+	else
+		__free_pages(test->page, ilog2(test->nr_pages));
+
 	kfree(test);
 }
 
