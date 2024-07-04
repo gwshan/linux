@@ -930,35 +930,33 @@ static void dump_show_cache_register(struct seq_file *m)
 	seq_puts(m, "\n");
 }
 
-static void dump_show_mpam_extra_register(struct seq_file *m)
+static unsigned long dump_show_mpam_acpi_table(struct seq_file *m)
 {
 	struct acpi_table_header *header = NULL;
 	struct acpi_mpam_msc_node *node = NULL;
 	char *offset, *end;
-	unsigned long v, phys = 0UL;
-	void __iomem *base;
-	unsigned int i, val;
+	unsigned long phys = 0UL;
 
 	seq_puts(m, "\n");
 	acpi_get_table(ACPI_SIG_MPAM, 0, &header);
 	if (!header) {
 		seq_puts(m, "ACPI_SIG_MPAM not found\n");
-		return;
+		return phys;
 	}
 
 	seq_puts  (m, "ACPI MPAM Table Header\n");
 	seq_puts  (m, "\n");
-	seq_printf(m, "signature              %c%c%c%c\n",
+	seq_printf(m, "  signature              %c%c%c%c\n",
 		   header->signature[3], header->signature[2],
 		   header->signature[1], header->signature[0]);
-	seq_printf(m, "length                 %x\n", header->length);
-	seq_printf(m, "revision               %x\n", header->revision);
-	seq_printf(m, "checksum               %x\n", header->checksum);
-	seq_printf(m, "oem_id                 %s\n", header->oem_id);
-	seq_printf(m, "oem_table_id           %s\n", header->oem_table_id);
-	seq_printf(m, "oem_revision           %x\n", header->oem_revision);
-	seq_printf(m, "asl_compiler_id        %s\n", header->asl_compiler_id);
-	seq_printf(m, "asl_compiler_revision  %x\n", header->asl_compiler_revision);
+	seq_printf(m, "  length                 %x\n", header->length);
+	seq_printf(m, "  revision               %x\n", header->revision);
+	seq_printf(m, "  checksum               %x\n", header->checksum);
+	seq_printf(m, "  oem_id                 %s\n", header->oem_id);
+	seq_printf(m, "  oem_table_id           %s\n", header->oem_table_id);
+	seq_printf(m, "  oem_revision           %x\n", header->oem_revision);
+	seq_printf(m, "  asl_compiler_id        %s\n", header->asl_compiler_id);
+	seq_printf(m, "  asl_compiler_revision  %x\n", header->asl_compiler_revision);
 	seq_puts  (m, "\n");
 
 	offset = (char *)header;
@@ -968,41 +966,41 @@ static void dump_show_mpam_extra_register(struct seq_file *m)
 		node = (struct acpi_mpam_msc_node *)offset;
 		seq_puts  (m, "ACPI MPAM MSC Node\n");
 		seq_puts  (m, "\n");
-		seq_printf(m, "length                        %x\n",
+		seq_printf(m, "  length                        %x\n",
 			   node->length);
-		seq_printf(m, "interface_type                %x\n",
+		seq_printf(m, "  interface_type                %x\n",
 			   node->interface_type);
-		seq_printf(m, "reserved                      %x\n",
+		seq_printf(m, "  reserved                      %x\n",
 			   node->reserved);
-		seq_printf(m, "identifier                    %x\n",
+		seq_printf(m, "  identifier                    %x\n",
 			   node->identifier);
-		seq_printf(m, "base_address                  %llx\n",
+		seq_printf(m, "  base_address                  %llx\n",
 			   node->base_address);
-		seq_printf(m, "mmio_size                     %x\n",
+		seq_printf(m, "  mmio_size                     %x\n",
 			   node->mmio_size);
-		seq_printf(m, "overflow_interrupt            %x\n",
+		seq_printf(m, "  overflow_interrupt            %x\n",
 			   node->overflow_interrupt);
-		seq_printf(m, "overflow_interrupt_flags      %x\n",
+		seq_printf(m, "  overflow_interrupt_flags      %x\n",
 			   node->overflow_interrupt_flags);
-		seq_printf(m, "reserved1                     %x\n",
+		seq_printf(m, "  reserved1                     %x\n",
 			   node->reserved1);
-		seq_printf(m, "overflow_interrupt_affinity   %x\n",
+		seq_printf(m, "  overflow_interrupt_affinity   %x\n",
 			   node->overflow_interrupt_affinity);
-		seq_printf(m, "error_intrrupt                %x\n",
+		seq_printf(m, "  error_intrrupt                %x\n",
 			   node->error_interrupt);
-		seq_printf(m, "error_interrupt_flags         %x\n",
+		seq_printf(m, "  error_interrupt_flags         %x\n",
 			   node->error_interrupt_flags);
-		seq_printf(m, "reserved2                     %x\n",
+		seq_printf(m, "  reserved2                     %x\n",
 			   node->reserved2);
-		seq_printf(m, "error_interrupt_affinity      %x\n",
+		seq_printf(m, "  error_interrupt_affinity      %x\n",
 			   node->error_interrupt_affinity);
-		seq_printf(m, "max_nrdy_usec                 %x\n",
+		seq_printf(m, "  max_nrdy_usec                 %x\n",
 			   node->max_nrdy_usec);
-		seq_printf(m, "hardware_id_linked_device     %llx\n",
+		seq_printf(m, "  hardware_id_linked_device     %llx\n",
 			   node->hardware_id_linked_device);
-		seq_printf(m, "instance_id_linked_device     %x\n",
+		seq_printf(m, "  instance_id_linked_device     %x\n",
 			   node->instance_id_linked_device);
-		seq_printf(m, "num_resouce_nodes             %x\n",
+		seq_printf(m, "  num_resouce_nodes             %x\n",
 			   node->num_resouce_nodes);
 		seq_puts  (m, "\n");
 
@@ -1010,10 +1008,56 @@ static void dump_show_mpam_extra_register(struct seq_file *m)
 		offset += sizeof(*node);
 	}
 
-	if (!phys) {
+	if (!phys)
 		seq_puts(m, "No MSC node found\n");
-		return;
-	}
+
+	return phys;
+}
+
+/* MPAM hardware feature bits */
+#define MPAMF_IDR_HAS_NFU			BIT(43)
+#define MPAMF_IDR_HAS_ENDIS			BIT(42)
+#define MPAMF_IDR_HAS_SP4			BIT(41)
+#define MPAMF_IDR_HAS_ERR_MSI			BIT(40)
+#define MPAMF_IDR_HAS_ESR			BIT(39)
+#define MPAMF_IDR_HAS_EXTD_ESR			BIT(38)
+#define MPAMF_IDR_NO_IMPL_MSMON			BIT(37)
+#define MPAMF_IDR_NO_IMPL_PART			BIT(36)
+#define MPAMF_IDR_HAS_RIS			BIT(32)
+#define MPAMF_IDR_HAS_PARTID_NRW		BIT(31)
+#define MPAMF_IDR_HAS_MSMON			BIT(30)
+#define MPAMF_IDR_HAS_IMPL_IDR			BIT(29)
+#define MPAMF_IDR_EXT				BIT(28)
+#define MPAMF_IDR_HAS_PRI_PART			BIT(27)
+#define MPAMF_IDR_HAS_MBW_PART			BIT(26)
+#define MPAMF_IDR_HAS_CPOR_PART			BIT(25)
+#define MPAMF_IDR_HAS_CCAP_PART			BIT(24)
+#define MPAMF_CCAP_IDR_NO_CMAX			BIT(30)
+#define MPAMF_CCAP_IDR_HAS_CMIN			BIT(29)
+#define MPAMF_CCAP_IDR_HAS_CASSOC		BIT(28)
+#define MPAMF_MBW_IDR_HAS_PROP			BIT(13)
+#define MPAMF_MBW_IDR_HAS_PBM			BIT(12)
+#define MPAMF_MBW_IDR_HAS_MAX			BIT(11)
+#define MPAMF_MBW_IDR_HAS_MIN			BIT(10)
+#define MPAMF_PRI_IDR_HAS_DSPRI			BIT(16)
+#define MPAMF_MSMON_IDR_HAS_LOCAL_CAPT_EVENT	BIT(31)
+#define MPAMF_MSMON_IDR_HAS_OFLW_MSI		BIT(29)
+#define MPAMF_MSMON_IDR_HAS_OFLOW_SR		BIT(28)
+#define MPAMF_MSMON_IDR_MSMON_MBWU		BIT(17)
+#define MPAMF_MSMON_IDR_MSMON_CSU		BIT(16)
+#define MPAMF_CSUMON_IDR_HAS_CAPTURE		BIT(31)
+#define MPAMF_CSUMON_IDR_HAS_OFSR		BIT(26)
+#define MPAMF_MBWUMON_IDR_HAS_CAPTURE		BIT(31)
+#define MPAMF_MBWUMON_IDR_HAS_LONG		BIT(30)
+#define MPAMF_MBWUMON_IDR_HAS_OFSR		BIT(26)
+
+static void dump_show_mpam_hw_register(struct seq_file *m, unsigned long phys)
+{
+	void __iomem *base;
+	unsigned long idr;
+	unsigned int cpor_idr, ccap_idr, mbw_idr, pri_idr;
+	unsigned int msmon_idr, msmon_csu_idr, msmon_mbwu_idr;
+	unsigned int count, i;
 
 	base = ioremap(phys, 0x4000);
 	if (!base) {
@@ -1023,102 +1067,249 @@ static void dump_show_mpam_extra_register(struct seq_file *m)
 
 	seq_puts  (m, "Hardware Registers\n");
 	seq_puts  (m, "\n");
-	v = readq(base + 0x0000);
-	seq_printf(m, "MPAMF_IDR                   %016lx\n", v);
+	idr = readl(base + 0x0000);
+	if (idr & MPAMF_IDR_EXT)
+		idr = readq(base + 0x0000);
+	seq_printf(m, "MPAMF_IDR                   %016lx\n", idr);
 	seq_puts  (m, "--------------------------------------------\n");
-	seq_printf(m, "63:60 Res0                  %lx\n", FIELD_GET(GENMASK(63, 60), v));
-	seq_printf(m, "59:56 RIS_MAX               %lx\n", FIELD_GET(GENMASK(59, 56), v));
-	seq_printf(m, "55:44 Res1                  %lx\n", FIELD_GET(GENMASK(55, 44), v));
-	seq_printf(m, "   43 HAS_NFU               %lx\n", FIELD_GET(GENMASK(43, 43), v));
-	seq_printf(m, "   42 HAS_ENDIS             %lx\n", FIELD_GET(GENMASK(42, 42), v));
-	seq_printf(m, "   41 SP4                   %lx\n", FIELD_GET(GENMASK(41, 41), v));
-	seq_printf(m, "   40 HAS_ERR_MSI           %lx\n", FIELD_GET(GENMASK(40, 40), v));
-	seq_printf(m, "   39 HAS_ESR               %lx\n", FIELD_GET(GENMASK(39, 39), v));
-	seq_printf(m, "   38 HAS_EXTD_ESR          %lx\n", FIELD_GET(GENMASK(38, 38), v));
-	seq_printf(m, "   37 NO_IMPL_MSMON         %lx\n", FIELD_GET(GENMASK(37, 37), v));
-	seq_printf(m, "   36 NO_IMPL_PART          %lx\n", FIELD_GET(GENMASK(36, 36), v));
-	seq_printf(m, "35:33 Res2                  %lx\n", FIELD_GET(GENMASK(35, 33), v));
-	seq_printf(m, "   32 HAS_RIS               %lx\n", FIELD_GET(GENMASK(32, 32), v));
-	seq_printf(m, "   31 HAS_PARTID_NRW        %lx\n", FIELD_GET(GENMASK(31, 31), v));
-	seq_printf(m, "   30 HAS_MSMON             %lx\n", FIELD_GET(GENMASK(30, 30), v));
-	seq_printf(m, "   29 HAS_IMPL_IDR          %lx\n", FIELD_GET(GENMASK(29, 29), v));
-	seq_printf(m, "   28 EXT                   %lx\n", FIELD_GET(GENMASK(28, 28), v));
-	seq_printf(m, "   27 HAS_PRI_PART          %lx\n", FIELD_GET(GENMASK(27, 27), v));
-	seq_printf(m, "   26 HAS_MBW_PART          %lx\n", FIELD_GET(GENMASK(26, 26), v));
-	seq_printf(m, "   25 HAS_CPOR_PART         %lx\n", FIELD_GET(GENMASK(25, 25), v));
-	seq_printf(m, "   24 HAS_CCAP_PART         %lx\n", FIELD_GET(GENMASK(24, 24), v));
-	seq_printf(m, "23:16 PMG_MAX               %lx\n", FIELD_GET(GENMASK(23, 16), v));
-	seq_printf(m, "15:00 PARTID_MAX            %lx\n", FIELD_GET(GENMASK(15,  0), v));
+	seq_printf(m, "63:60 Res0                  %lx\n", FIELD_GET(GENMASK(63, 60), idr));
+	seq_printf(m, "59:56 RIS_MAX               %lx\n", FIELD_GET(GENMASK(59, 56), idr));
+	seq_printf(m, "55:44 Res1                  %lx\n", FIELD_GET(GENMASK(55, 44), idr));
+	seq_printf(m, "   43 HAS_NFU               %lx\n", FIELD_GET(GENMASK(43, 43), idr));
+	seq_printf(m, "   42 HAS_ENDIS             %lx\n", FIELD_GET(GENMASK(42, 42), idr));
+	seq_printf(m, "   41 SP4                   %lx\n", FIELD_GET(GENMASK(41, 41), idr));
+	seq_printf(m, "   40 HAS_ERR_MSI           %lx\n", FIELD_GET(GENMASK(40, 40), idr));
+	seq_printf(m, "   39 HAS_ESR               %lx\n", FIELD_GET(GENMASK(39, 39), idr));
+	seq_printf(m, "   38 HAS_EXTD_ESR          %lx\n", FIELD_GET(GENMASK(38, 38), idr));
+	seq_printf(m, "   37 NO_IMPL_MSMON         %lx\n", FIELD_GET(GENMASK(37, 37), idr));
+	seq_printf(m, "   36 NO_IMPL_PART          %lx\n", FIELD_GET(GENMASK(36, 36), idr));
+	seq_printf(m, "35:33 Res2                  %lx\n", FIELD_GET(GENMASK(35, 33), idr));
+	seq_printf(m, "   32 HAS_RIS               %lx\n", FIELD_GET(GENMASK(32, 32), idr));
+	seq_printf(m, "   31 HAS_PARTID_NRW        %lx\n", FIELD_GET(GENMASK(31, 31), idr));
+	seq_printf(m, "   30 HAS_MSMON             %lx\n", FIELD_GET(GENMASK(30, 30), idr));
+	seq_printf(m, "   29 HAS_IMPL_IDR          %lx\n", FIELD_GET(GENMASK(29, 29), idr));
+	seq_printf(m, "   28 EXT                   %lx\n", FIELD_GET(GENMASK(28, 28), idr));
+	seq_printf(m, "   27 HAS_PRI_PART          %lx\n", FIELD_GET(GENMASK(27, 27), idr));
+	seq_printf(m, "   26 HAS_MBW_PART          %lx\n", FIELD_GET(GENMASK(26, 26), idr));
+	seq_printf(m, "   25 HAS_CPOR_PART         %lx\n", FIELD_GET(GENMASK(25, 25), idr));
+	seq_printf(m, "   24 HAS_CCAP_PART         %lx\n", FIELD_GET(GENMASK(24, 24), idr));
+	seq_printf(m, "23:16 PMG_MAX               %lx\n", FIELD_GET(GENMASK(23, 16), idr));
+	seq_printf(m, "15:00 PARTID_MAX            %lx\n", FIELD_GET(GENMASK(15,  0), idr));
 	seq_puts  (m, "--------------------------------------------\n");
-	seq_printf(m, "MPAMF_SIDR                  %08x\n",    readl(base + 0x0008));
-	seq_printf(m, "MPAM_IIDR                   %08x\n",    readl(base + 0x0018));
-	seq_printf(m, "MPAM_AIDR                   %08x\n",    readl(base + 0x0020));
-	seq_printf(m, "MPAMF_IMPL_IDR              %08x\n",    readl(base + 0x0028));
-	seq_printf(m, "MPAMF_CPOR_IDR              %08x\n",    readl(base + 0x0030));
-	seq_printf(m, "MPAMF_CCAP_IDR              %08x\n",    readl(base + 0x0038));
-	seq_printf(m, "MPAMF_MBW_IDR               %08x\n",    readl(base + 0x0040));
-	seq_printf(m, "MPAMF_PRI_IDR               %08x\n",    readl(base + 0x0048));
-	seq_printf(m, "MPAMF_PARTID_NRW_IDR        %08x\n",    readl(base + 0x0050));
-	seq_printf(m, "MPAMF_MSMON_IDR             %08x\n",    readl(base + 0x0080));
-	seq_printf(m, "MPAMF_CSUMON_IDR            %08x\n",    readl(base + 0x0088));
-	seq_printf(m, "MPAMF_MBWUMON_IDR           %08x\n",    readl(base + 0x0090));
-	seq_printf(m, "MPAMF_ERR_MSI_MPAM          %08x\n",    readl(base + 0x00DC));
-	seq_printf(m, "MPAMF_ERR_MSI_ADDR_L        %08x\n",    readl(base + 0x00E0));
-	seq_printf(m, "MPAMF_ERR_MSI_ADDR_H        %08x\n",    readl(base + 0x00E4));
-	seq_printf(m, "MPAMF_ERR_MSI_DATA          %08x\n",    readl(base + 0x00E8));
-	seq_printf(m, "MPAMF_ERR_MSI_ATTR          %08x\n",    readl(base + 0x00EC));
-	seq_printf(m, "MPAMF_ECR                   %08x\n",    readl(base + 0x00F0));
-	seq_printf(m, "MPAMF_ESR                   %08x\n",    readl(base + 0x00F8));
-	seq_printf(m, "MPAMCFG_PART_SEL            %08x\n",    readl(base + 0x0100));
-	seq_printf(m, "MPAMCFG_CMAX                %08x\n",    readl(base + 0x0108));
-	seq_printf(m, "MPAMCFG_CMIN                %08x\n",    readl(base + 0x0110));
-	seq_printf(m, "MPAMCFG_CASSOC              %08x\n",    readl(base + 0x0118));
-	seq_printf(m, "MPAMCFG_MBW_MIN             %08x\n",    readl(base + 0x0200));
-	seq_printf(m, "MPAMCFG_MBW_MAX             %08x\n",    readl(base + 0x0208));
-	seq_printf(m, "MPAMCFG_MBW_WINWD           %08x\n",    readl(base + 0x0220));
-	seq_printf(m, "MPAMCFG_EN                  %08x\n",    readl(base + 0x0300));
-	seq_printf(m, "MPAMCFG_DIS                 %08x\n",    readl(base + 0x0310));
-	seq_printf(m, "MPAMCFG_EN_FLAGS            %08x\n",    readl(base + 0x0320));
-	seq_printf(m, "MPAMCFG_PRI                 %08x\n",    readl(base + 0x0400));
-	seq_printf(m, "MPAMCFG_MBW_PROP            %08x\n",    readl(base + 0x0500));
-	seq_printf(m, "MPAMCFG_INTPARTID           %08x\n",    readl(base + 0x0600));
-	seq_printf(m, "MSMON_CFG_MON_SEL           %08x\n",    readl(base + 0x0800));
-	seq_printf(m, "MSMON_CAPT_EVNT             %08x\n",    readl(base + 0x0808));
-	seq_printf(m, "MSMON_CFG_CSU_FLT           %08x\n",    readl(base + 0x0810));
-	seq_printf(m, "MSMON_CFG_CSU_CTL           %08x\n",    readl(base + 0x0818));
-	seq_printf(m, "MSMON_CFG_MBWU_FLT          %08x\n",    readl(base + 0x0820));
-	seq_printf(m, "MSMON_CFG_MBWU_CTL          %08x\n",    readl(base + 0x0828));
-	seq_printf(m, "MSMON_CSU                   %08x\n",    readl(base + 0x0840));
-	seq_printf(m, "MSMON_CSU_CAPTURE           %08x\n",    readl(base + 0x0848));
-	seq_printf(m, "MSMON_CSU_OFSR              %08x\n",    readl(base + 0x0858));
-	seq_printf(m, "MSMON_MBWU                  %08x\n",    readl(base + 0x0860));
-	seq_printf(m, "MSMON_MBWU_CAPTURE          %08x\n",    readl(base + 0x0868));
-	seq_printf(m, "MSMON_MBWU_L                %08x\n",    readl(base + 0x0880));
-	seq_printf(m, "MSMON_MBWU_L_CAPTURE        %08x\n",    readl(base + 0x0890));
-	seq_printf(m, "MSMON_MBWU_OFSR             %08x\n",    readl(base + 0x0898));
-	seq_printf(m, "MSMON_OFLOW_MSI_MPAM        %08x\n",    readl(base + 0x08DC));
-	seq_printf(m, "MSMON_OFLOW_MSI_ADDR_L      %08x\n",    readl(base + 0x08E0));
-	seq_printf(m, "MSMON_OFLOW_MSI_ADDR_H      %08x\n",    readl(base + 0x08E4));
-	seq_printf(m, "MSMON_OFLOW_MSI_DATA        %08x\n",    readl(base + 0x08E8));
-	seq_printf(m, "MSMON_OFLOW_MSI_ATTR        %08x\n",    readl(base + 0x08EC));
-	seq_printf(m, "MSMON_OFLOW_SR              %08x\n",    readl(base + 0x08F0));
 
-	for (i = 0; i < 1024; i++) {
-		val = readl(base + 0x1000 + i * 4);
-		if (!val) continue;
-
-		seq_printf(m, "MPAMCFG_CPBM<%04d>          %08x\n", i, val);
+	seq_printf(m, "MPAMF_SIDR                  %08x\n", readl(base + 0x0008));
+	seq_printf(m, "MPAM_IIDR                   %08x\n", readl(base + 0x0018));
+	seq_printf(m, "MPAM_AIDR                   %08x\n", readl(base + 0x0020));
+	if (idr & MPAMF_IDR_HAS_IMPL_IDR) {
+		seq_printf(m, "MPAMF_IMPL_IDR              %08x\n",
+			   readl(base + 0x0028));
 	}
 
-	for (i = 0; i < 128; i++) {
-		val = readl(base + 0x2000 + i * 4);
-		if (!val) continue;
+	seq_printf(m, "MPAMCFG_PART_SEL            %08x\n", readl(base + 0x0100));
 
-		seq_printf(m, "MPAMCFG_MBW_PBM<%03d>       %08x\n", i, val);
+	/* MPAMF_IDR_HAS_CCAP_PART */
+	if (idr & MPAMF_IDR_HAS_CCAP_PART) {
+		ccap_idr = readl(base + 0x0038);
+		seq_printf(m, "MPAMF_CCAP_IDR              %08x\n", ccap_idr);
+
+		if (!(ccap_idr & MPAMF_CCAP_IDR_NO_CMAX)) {
+			seq_printf(m, "MPAMCFG_CMAX                %08x\n",
+				   readl(base + 0x0108));
+		}
+
+		if (ccap_idr & MPAMF_CCAP_IDR_HAS_CMIN) {
+			seq_printf(m, "MPAMCFG_CMIN                %08x\n",
+				   readl(base + 0x0110));
+		}
+
+		if (ccap_idr & MPAMF_CCAP_IDR_HAS_CASSOC) {
+			seq_printf(m, "MPAMCFG_CASSOC              %08x\n",
+				   readl(base + 0x0118));
+		}
+	}
+
+	/* MPAMF_IDR_HAS_CPOR_PART */
+	if (idr & MPAMF_IDR_HAS_CPOR_PART) {
+		cpor_idr = readl(base + 0x0030);
+		seq_printf(m, "MPAMF_CPOR_IDR              %08x\n", cpor_idr);
+
+		count = (cpor_idr & 0xFFFF) / 32;
+		for (i = 0; i <= count; i++) {
+			seq_printf(m, "MAPMCFG_CPBM_%04d           %08x\n",
+				   i, readl(base + 0x1000 + i * 4));
+		}
+	}
+
+	/* MPAMF_IDR_HAS_MBW_PART */
+	if (idr & MPAMF_IDR_HAS_MBW_PART) {
+		mbw_idr = readl(base + 0x0040);
+		seq_printf(m, "MAPMF_MBW_IDR               %08x\n", mbw_idr);
+
+		if (mbw_idr & MPAMF_MBW_IDR_HAS_PBM) {
+			count = ((mbw_idr & 0x1fff0000) >> 16) / 32;
+			for (i = 0; i <= count; i++) {
+				seq_printf(m, "MPAMCFG_MBW_PBM_%04d        %08x\n",
+					   i, readl(base + 0x2000 + i * 4));
+			}
+		}
+
+
+		if (mbw_idr & MPAMF_MBW_IDR_HAS_PROP) {
+			seq_printf(m, "MPAMCFG_MBW_PROP            %08x\n",
+				   readl(base + 0x0500));
+		}
+
+		if (mbw_idr & MPAMF_MBW_IDR_HAS_MAX) {
+			seq_printf(m, "MPAMCFG_MBW_MAX             %08x\n",
+				   readl(base + 0x0208));
+		}
+
+		if (mbw_idr & MPAMF_MBW_IDR_HAS_MIN) {
+			seq_printf(m, "MPAMCFG_MBW_MIN             %08x\n",
+				   readl(base + 0x200));
+		}
+	}
+
+	/* MPAMF_IDR_HAS_PRI_PART */
+	if (idr & MPAMF_IDR_HAS_PRI_PART) {
+		pri_idr = readl(base + 0x0048);
+		seq_printf(m, "MPAMF_PRI_IDR               %08x\n",
+			   pri_idr);
+		seq_printf(m, "MPAM_PRI                    %08x\n",
+			   readl(base + 0x0400));
+	}
+
+	/* MPAMF_IDR_HAS_PARTID_NRW */
+	if (idr & MPAMF_IDR_HAS_PARTID_NRW) {
+		seq_printf(m, "MPAMF_PARTID_NRW_IDR        %08x\n",
+			   readl(base + 0x0050));
+		seq_printf(m, "MPAMCFG_INTPARTID           %08x\n",
+			   readl(base + 0x0600));
+	}
+
+	/* MPAMF_IDR_HAS_ENDIS */
+	if (idr & MPAMF_IDR_HAS_ENDIS) {
+		seq_printf(m, "MPAMCFG_EN                  %08x\n",
+			   readl(base + 0x0300));
+		seq_printf(m, "MPAMCFG_DIS                 %08x\n",
+			   readl(base + 0x0310));
+		seq_printf(m, "MPAMCFG_EN_FLAGS            %08x\n",
+			   readl(base + 0x0320));
+	}
+
+	/* MPAMF_IDR_HAS_ESR */
+	if (idr & MPAMF_IDR_HAS_ESR) {
+		seq_printf(m, "MPAMF_ECR                   %08x\n",
+			   readl(base + 0x00F0));
+		if (idr & MPAMF_IDR_HAS_EXTD_ESR) {
+			seq_printf(m, "MPAMF_ESR                   %016llx\n",
+				   readq(base + 0x00f8));
+		} else {
+			seq_printf(m, "MPAMF_ESR                   %08x\n",
+				   readl(base + 0x00f8));
+		}
+	}
+
+	/* MPAMF_IDR_HAS_ERR_MSI */
+	if (idr & MPAMF_IDR_HAS_ERR_MSI) {
+		seq_printf(m, "MPAMF_ERR_MSI_MPAM          %08x\n",
+			   readl(base + 0x00dc));
+		seq_printf(m, "MPAMF_ERR_MSI_ADDR_L        %08x\n",
+			   readl(base + 0x00e0));
+		seq_printf(m, "MPAMF_ERR_MSI_ADDR_H        %08x\n",
+			   readl(base + 0x00e4));
+		seq_printf(m, "MPAMF_ERR_MSI_DATA          %08x\n",
+			   readl(base + 0x00e8));
+		seq_printf(m, "MPAMF_ERR_MSI_ATTR          %08x\n",
+			   readl(base + 0x00ec));
+	}
+
+	/* MPAMF_IDR_HAS_MSMON */
+	if (idr & MPAMF_IDR_HAS_MSMON) {
+		msmon_idr = readl(base + 0x80);
+		seq_printf(m, "MPAMF_MSMON_IDR             %08x\n",
+			   msmon_idr);
+		seq_printf(m, "MSMON_CFG_MON_SEL           %08x\n",
+			   readl(base + 0x0800));
+
+		if (msmon_idr & MPAMF_MSMON_IDR_HAS_LOCAL_CAPT_EVENT) {
+			seq_printf(m, "MSMON_CAP_EVENT             %08x\n",
+				   readl(base + 0x0808));
+		}
+
+		if (msmon_idr & MPAMF_MSMON_IDR_MSMON_CSU) {
+			msmon_csu_idr = readl(base + 0x0088);
+			seq_printf(m, "MPAMF_CSUMON_IDR            %08x\n",
+				   msmon_csu_idr); 
+			seq_printf(m, "MSMON_CFG_CSU_FLT           %08x\n",
+				   readl(base + 0x0810));
+			seq_printf(m, "MSMON_CFG_CSU_CTL           %08x\n",
+				   readl(base + 0x0818));
+			seq_printf(m, "MSMON_CSU                   %08x\n",
+				   readl(base + 0x0840));
+
+			if (msmon_csu_idr & MPAMF_CSUMON_IDR_HAS_CAPTURE) {
+				seq_printf(m, "MSMON_CSU_CAPTURE           %08x\n",
+					   readl(base + 0x0848));
+			}
+
+			if (msmon_csu_idr & MPAMF_CSUMON_IDR_HAS_OFSR) {
+				seq_printf(m, "MSMON_CSU_OFSR              %08x\n",
+					   readl(base + 0x0858));
+			}
+		}
+
+		if (msmon_idr & MPAMF_MSMON_IDR_MSMON_MBWU) {
+			msmon_mbwu_idr = readl(base + 0x0090);
+			seq_printf(m, "MPAMF_MBWUMON_IDR           %08x\n",
+				   msmon_mbwu_idr);
+			seq_printf(m, "MSMON_CFG_MBWU_FLT          %08x\n",
+				   readl(base + 0x0820));
+			seq_printf(m, "MSMON_CFG_MBWU_CTL          %08x\n",
+				   readl(base + 0x0828));
+			seq_printf(m, "MSMON_MBWU                  %08x\n",
+				   readl(base + 0x0860));
+
+			if (msmon_mbwu_idr & MPAMF_MBWUMON_IDR_HAS_CAPTURE) {
+				seq_printf(m, "MSMON_MBWU_CAPTURE          %08x\n",
+					   readl(base + 0x0868));
+			}
+
+			seq_printf(m, "MSMON_MBWU_L                %08x\n",
+				   readl(base + 0x0880));
+
+			if ((msmon_mbwu_idr & MPAMF_MBWUMON_IDR_HAS_CAPTURE) &&
+			    (msmon_mbwu_idr & MPAMF_MBWUMON_IDR_HAS_LONG)) {
+				seq_printf(m, "MSMON_MBWU_L_CAPTURE        %08x\n",
+					   readl(base + 0x0890));
+			}
+
+			if (msmon_mbwu_idr & MPAMF_MBWUMON_IDR_HAS_OFSR) {
+				seq_printf(m, "MSMON_MBWU_OFSR             %08x\n",
+					   readl(base + 0x0898));
+			}
+		}
+
+		if (msmon_idr & MPAMF_MSMON_IDR_HAS_OFLW_MSI) {
+			seq_printf(m, "MSMON_OFLOW_MSI_MPAM        %08x\n",
+				   readl(base + 0x08dc));
+			seq_printf(m, "MSMON_OFLOW_MSI_ADDR_L      %08x\n",
+				   readl(base + 0x08e0));
+			seq_printf(m, "MSMON_OFLOW_MSI_ADDR_H      %08x\n",
+				   readl(base + 0x08e4));
+			seq_printf(m, "MSMON_OFLOW_MSI_DATA        %08x\n",
+				   readl(base + 0x08e8));
+			seq_printf(m, "MSMON_OFLOW_MSI_ATTR        %08x\n",
+				   readl(base + 0x08ec));
+		}
+
+		if (msmon_idr & MPAMF_MSMON_IDR_HAS_OFLOW_SR) {
+			seq_printf(m, "MSMON_OFLOW_SR              %08x\n",
+				   readl(base + 0x08f0));
+		}
 	}
 
 	seq_puts  (m, "\n");
-
 	iounmap(base);
 }
 
@@ -1141,7 +1332,7 @@ static void dump_show_mpam_extra_register(struct seq_file *m)
 #endif
 #define SYS_MPAMVPMV_EL2	sys_reg(3, 4, 10, 4, 1)
 
-static void dump_show_mpam_register(struct seq_file *m)
+static void dump_show_mpam_cpu_register(struct seq_file *m)
 {
 	unsigned long major_version, minor_version, v;
 	bool has_sme;
@@ -1394,9 +1585,17 @@ static void dump_show_mpam_register(struct seq_file *m)
 	seq_printf(m, "   01 VPM_v01           %lx\n", FIELD_GET(GENMASK( 1,  1), v));
 	seq_printf(m, "   00 VPM_v00           %lx\n", FIELD_GET(GENMASK( 0,  0), v));
 	seq_puts  (m, "\n");
+}
 
-	/* Extra MPAM registers */
-	dump_show_mpam_extra_register(m);
+static void dump_show_mpam_register(struct seq_file *m)
+{
+	unsigned long phys;
+
+	dump_show_mpam_cpu_register(m);
+
+	phys = dump_show_mpam_acpi_table(m);
+	if (phys)
+		dump_show_mpam_hw_register(m, phys);
 }
 
 static void dump_show_process(struct seq_file *m)
