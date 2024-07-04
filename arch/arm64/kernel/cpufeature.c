@@ -2917,6 +2917,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 		ARM64_CPUID_FIELDS(ID_AA64MMFR0_EL1, TGRAN16, 52_BIT)
 #endif
 #endif
+	},
 #endif
 #ifdef CONFIG_ARM64_MPAM
 	{
