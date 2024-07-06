@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Driver to export the contiguous memory, which will be mapped to user
- * space. With it, the user space is able to measure the benchmarks,
- * affected by page-to-cache coloring.
- *
- * Author: Gavin Shan <gshan@redhat.com>
+ * Driver to export the contiguous memory block, which will be mapped
+ * to userspace. With it, the userspace program can come up with cache
+ * evictions by reading or writing to the memory block and then measure
+ * the benchmarks.
  */
 
 #include <linux/kernel.h>
@@ -53,20 +52,16 @@ static int test_cache_open(struct inode *inode, struct file *filp)
 static vm_fault_t test_cache_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
-	unsigned long addr = vma->vm_start;
-	unsigned long size = vma->vm_end - vma->vm_start;
-	pteval_t prot = pgprot_val(vma->vm_page_prot);
-	int ret;
 
-	ret = remap_pfn_range(vma, addr, page_to_pfn(test->page),
-			      size, __pgprot(prot));
-	if (ret) {
-		pr_warn("%s: Error %d from remap_pfn_range()\n",
-			__func__, ret);
-		return VM_FAULT_SIGSEGV;
-	}
+	pr_warn("%s: unhandled page fault\n", __func__);
+	pr_warn("\n");
+	pr_warn("%s: fault address 0x%lx, flags 0x%x\n",
+		__func__, vmf->address, vmf->flags);
+	pr_warn("%s: vma=[0x%lx  0x%lx  0x%lx  0x%llx]\n",
+		__func__, vma->vm_flags, vma->vm_start, vma->vm_end,
+		pgprot_val(vma->vm_page_prot));
 
-	return VM_FAULT_NOPAGE;
+	return VM_FAULT_SIGBUS;
 }
 
 static const struct vm_operations_struct test_cache_vm_ops = {
@@ -76,6 +71,7 @@ static const struct vm_operations_struct test_cache_vm_ops = {
 static int test_cache_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	unsigned long size = vma->vm_end - vma->vm_start;
+	int ret;
 
 	if (!IS_ALIGNED(vma->vm_start, PAGE_SIZE)) {
 		pr_warn("%s: start address 0x%lx isn't PAGE_SIZE aligned\n",
@@ -95,7 +91,25 @@ static int test_cache_mmap(struct file *filp, struct vm_area_struct *vma)
 		return -EINVAL;
 	}
 
+	/*
+	 * The vma's flags will be modified by remap_pfn_range() and
+	 * it requires mm->mmap_lock is taken as a writer. The condition
+	 * is false when CONFIG_PER_VMA_LOCK is enabled. This will lead
+	 * to unexpected warning when remap_pfn_range() is called in the
+	 * fault handler.
+	 *
+	 * Since mm->mmap_lock has been taken as a writer in the mapping
+	 * path, so the vma is populated by remap_pfn_range() in this
+	 * path.
+	 */
 	vma->vm_ops = &test_cache_vm_ops;
+	ret = remap_pfn_range(vma, vma->vm_start, page_to_pfn(test->page),
+			      size, vma->vm_page_prot);
+	if (ret) {
+		pr_warn("%s: Error %d from remap_pfn_range()\n",
+			__func__, ret);
+		return ret;
+	}
 
 	return 0;
 }
@@ -126,7 +140,6 @@ static struct miscdevice test_cache_dev = {
 
 static int __init test_cache_init(void)
 {
-	int nid = 1;	/* node 1 is preferred */
 	int ret = 0;
 
 	test = kzalloc(sizeof(*test), GFP_KERNEL);
@@ -138,7 +151,7 @@ static int __init test_cache_init(void)
 	/* Initialize test struct */
 	mutex_init(&test->mutex);
 	test->opened = false;
-	test->nid = (nid < MAX_NUMNODES && node_online(nid)) ? nid : 0;
+	test->nid = 0;
 	test->nr_pages = TEST_CACHE_MEM_SIZE / PAGE_SIZE;
 	test->page = NULL;
 	test->contig_pages = (test->nr_pages > MAX_ORDER_NR_PAGES) ? true : false;
@@ -146,11 +159,12 @@ static int __init test_cache_init(void)
 	/* Allocate memory */
 	if (test->contig_pages) {
 		test->page = alloc_contig_pages(test->nr_pages,
-						GFP_KERNEL | __GFP_THISNODE | __GFP_NOWARN,
-						test->nid, NULL);
+					GFP_KERNEL | __GFP_THISNODE | __GFP_NOWARN,
+					test->nid, NULL);
 	} else {
-		test->page = alloc_pages_node(test->nid, GFP_HIGHUSER_MOVABLE,
-					      ilog2(test->nr_pages));
+		test->page = alloc_pages_node(test->nid,
+					GFP_HIGHUSER_MOVABLE,
+					ilog2(test->nr_pages));
 	}
 
 	if (!test->page) {
