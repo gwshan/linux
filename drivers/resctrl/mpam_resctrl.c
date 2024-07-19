@@ -1034,3 +1034,7 @@ int mpam_resctrl_setup(void)
 
 	return err;
 }
+
+#ifdef CONFIG_MPAM_KUNIT_TEST
+#include "test_mpam_resctrl.c"
+#endif
