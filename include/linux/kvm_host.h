@@ -870,6 +870,12 @@ struct kvm {
 #define vcpu_err(vcpu, fmt, ...)					\
 	kvm_err("vcpu%i " fmt, (vcpu)->vcpu_id, ## __VA_ARGS__)
 
+#define KVM_DBG(on, args...)			\
+	do {					\
+		if ((on))			\
+			printk(KERN_INFO args);	\
+	} while (0)
+
 static inline void kvm_vm_dead(struct kvm *kvm)
 {
 	kvm->vm_dead = true;

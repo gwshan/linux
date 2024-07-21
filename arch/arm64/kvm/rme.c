@@ -1328,9 +1328,11 @@ int kvm_realm_enable_cap(struct kvm *kvm, struct kvm_enable_cap *cap)
 
 	switch (cap->args[0]) {
 	case KVM_CAP_ARM_RME_CONFIG_REALM:
+		KVM_DBG(true, "%s: KVM_CAP_ARM_RME_CONFIG_REALM\n", __func__);
 		r = kvm_rme_config_realm(kvm, cap);
 		break;
 	case KVM_CAP_ARM_RME_CREATE_RD:
+		KVM_DBG(true, "%s: KVM_CAP_ARM_RME_CREATE_RD\n", __func__);
 		r = kvm_create_realm(kvm);
 		break;
 	case KVM_CAP_ARM_RME_INIT_IPA_REALM: {
@@ -1342,6 +1344,9 @@ int kvm_realm_enable_cap(struct kvm *kvm, struct kvm_enable_cap *cap)
 			break;
 		}
 
+		KVM_DBG(true, "%s: KVM_CAP_ARM_RME_INIT_IPA_REALM\n", __func__);
+		KVM_DBG(true, "    init_ipa_base=0x%llx init_ipa_size=0x%llx\n",
+			args.init_ipa_base, args.init_ipa_size);
 		r = kvm_init_ipa_range_realm(kvm, &args);
 		break;
 	}
@@ -1354,10 +1359,14 @@ int kvm_realm_enable_cap(struct kvm *kvm, struct kvm_enable_cap *cap)
 			break;
 		}
 
+		KVM_DBG(true, "%s: KVM_CAP_ARM_RME_POPULATE_REALM\n", __func__);
+		KVM_DBG(true, "    populate_ipa_base=0x%llx populate_ipa_size=0x%llx\n",
+			args.populate_ipa_base, args.populate_ipa_size);
 		r = kvm_populate_realm(kvm, &args);
 		break;
 	}
 	case KVM_CAP_ARM_RME_ACTIVATE_REALM:
+		KVM_DBG(true, "%s: KVM_CAP_ARM_RME_ACTIVATE_REALM\n", __func__);
 		r = kvm_activate_realm(kvm);
 		break;
 	default:

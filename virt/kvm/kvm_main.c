@@ -5133,6 +5133,24 @@ static long kvm_vm_ioctl(struct file *filp,
 		    (mem.flags & ~KVM_SET_USER_MEMORY_REGION_V1_FLAGS))
 			goto out;
 
+		if (ioctl == KVM_SET_USER_MEMORY_REGION) {
+			KVM_DBG(true, "%s: KVM_SET_USER_MEMORY_REGION\n", __func__);
+			KVM_DBG(true, "  slot:               %d\n",     mem.slot);
+			KVM_DBG(true, "  flags:              0x%x\n",   mem.flags);
+			KVM_DBG(true, "  guest_phys_addr:    0x%llx\n", mem.guest_phys_addr);
+			KVM_DBG(true, "  memory_size:        0x%llx\n", mem.memory_size);
+			KVM_DBG(true, "  userspace_addr:     0x%llx\n", mem.userspace_addr);
+		} else {
+			KVM_DBG(true, "%s: KVM_SET_USER_MEMORY_REGION2\n", __func__);
+			KVM_DBG(true, "  slot:               %d\n",     mem.slot);
+			KVM_DBG(true, "  flags:              0x%x\n",   mem.flags);
+			KVM_DBG(true, "  guest_phys_addr:    0x%llx\n", mem.guest_phys_addr);
+			KVM_DBG(true, "  memory_size:        0x%llx\n", mem.memory_size);
+			KVM_DBG(true, "  userspace_addr:     0x%llx\n", mem.userspace_addr);
+			KVM_DBG(true, "  guest_memfd_offset: 0x%llx\n", mem.guest_memfd_offset);
+			KVM_DBG(true, "  guest_memfd:        %d\n",     mem.guest_memfd);
+		}
+
 		r = kvm_vm_ioctl_set_memory_region(kvm, &mem);
 		break;
 	}
@@ -5417,6 +5435,8 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 	int r, fd;
 	struct kvm *kvm;
 	struct file *file;
+
+	KVM_DBG(true, "%s: type=0x%lx\n", __func__, type);
 
 	fd = get_unused_fd_flags(O_CLOEXEC);
 	if (fd < 0)
