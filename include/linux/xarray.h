@@ -1399,7 +1399,7 @@ struct xa_state {
  *
  * Declare and initialise an xa_state on the stack.  This variant of
  * XA_STATE() allows you to specify the 'order' of the element you
- * want to operate on.`
+ * want to operate on.
  */
 #define XA_STATE_ORDER(name, array, index, order)		\
 	struct xa_state name = __XA_STATE(array,		\
