@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 
 #include "internal.h"
+#define CREATE_TRACE_POINTS
 #include "trace.h"
 
 /**
