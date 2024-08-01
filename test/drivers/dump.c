@@ -930,18 +930,20 @@ static void dump_show_cache_register(struct seq_file *m)
 	seq_puts(m, "\n");
 }
 
-static unsigned long dump_show_mpam_acpi_table(struct seq_file *m)
+static unsigned int dump_show_mpam_acpi_table(struct seq_file *m,
+					      unsigned long *bases,
+					      unsigned int max_entries)
 {
 	struct acpi_table_header *header = NULL;
 	struct acpi_mpam_msc_node *node = NULL;
 	char *offset, *end;
-	unsigned long phys = 0UL;
+	unsigned int entry = 0;
 
 	seq_puts(m, "\n");
 	acpi_get_table(ACPI_SIG_MPAM, 0, &header);
 	if (!header) {
 		seq_puts(m, "ACPI_SIG_MPAM not found\n");
-		return phys;
+		return entry;
 	}
 
 	seq_puts  (m, "ACPI MPAM Table Header\n");
@@ -964,6 +966,11 @@ static unsigned long dump_show_mpam_acpi_table(struct seq_file *m)
 	offset += sizeof(*header);
 	while (offset < end && (end - offset) >= sizeof(*node)) {
 		node = (struct acpi_mpam_msc_node *)offset;
+		if (entry < max_entries) {
+			bases[entry] = node->base_address;
+			entry++;
+		}
+
 		seq_puts  (m, "ACPI MPAM MSC Node\n");
 		seq_puts  (m, "\n");
 		seq_printf(m, "  length                        %x\n",
@@ -1004,14 +1011,13 @@ static unsigned long dump_show_mpam_acpi_table(struct seq_file *m)
 			   node->num_resouce_nodes);
 		seq_puts  (m, "\n");
 
-		phys = node->base_address;
-		offset += sizeof(*node);
+		offset += node->length;
 	}
 
-	if (!phys)
+	if (!entry)
 		seq_puts(m, "No MSC node found\n");
 
-	return phys;
+	return entry;
 }
 
 /* MPAM hardware feature bits */
@@ -1051,7 +1057,9 @@ static unsigned long dump_show_mpam_acpi_table(struct seq_file *m)
 #define MPAMF_MBWUMON_IDR_HAS_LONG		BIT(30)
 #define MPAMF_MBWUMON_IDR_HAS_OFSR		BIT(26)
 
-static void dump_show_mpam_hw_register(struct seq_file *m, unsigned long phys)
+static void dump_show_mpam_hw_register(struct seq_file *m,
+				       unsigned long phys,
+				       unsigned int idx)
 {
 	void __iomem *base;
 	unsigned long idr;
@@ -1065,7 +1073,7 @@ static void dump_show_mpam_hw_register(struct seq_file *m, unsigned long phys)
 		return;
 	}
 
-	seq_puts  (m, "Hardware Registers\n");
+	seq_printf(m, "Hardware Registers [index=%02d]\n", idx);
 	seq_puts  (m, "\n");
 	idr = readl(base + 0x0000);
 	if (idr & MPAMF_IDR_EXT)
@@ -1589,13 +1597,14 @@ static void dump_show_mpam_cpu_register(struct seq_file *m)
 
 static void dump_show_mpam_register(struct seq_file *m)
 {
-	unsigned long phys;
+	unsigned long bases[64];
+	unsigned int i, count;
 
 	dump_show_mpam_cpu_register(m);
 
-	phys = dump_show_mpam_acpi_table(m);
-	if (phys)
-		dump_show_mpam_hw_register(m, phys);
+	count = dump_show_mpam_acpi_table(m, bases, 64);
+	for (i = 0; i < count; i++)
+		dump_show_mpam_hw_register(m, bases[i], i);
 }
 
 static void dump_show_process(struct seq_file *m)
