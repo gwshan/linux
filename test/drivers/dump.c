@@ -935,9 +935,10 @@ static unsigned int dump_show_mpam_acpi_table(struct seq_file *m,
 					      unsigned int max_entries)
 {
 	struct acpi_table_header *header = NULL;
-	struct acpi_mpam_msc_node *node = NULL;
+	struct acpi_mpam_msc_node *msc = NULL;
+	struct acpi_mpam_resource_node *res = NULL;
 	char *offset, *end;
-	unsigned int entry = 0;
+	unsigned int i, entry = 0;
 
 	seq_puts(m, "\n");
 	acpi_get_table(ACPI_SIG_MPAM, 0, &header);
@@ -964,54 +965,119 @@ static unsigned int dump_show_mpam_acpi_table(struct seq_file *m,
 	offset = (char *)header;
 	end = offset + header->length;
 	offset += sizeof(*header);
-	while (offset < end && (end - offset) >= sizeof(*node)) {
-		node = (struct acpi_mpam_msc_node *)offset;
+	while (offset < end && (end - offset) >= sizeof(*msc)) {
+		msc = (struct acpi_mpam_msc_node *)offset;
 		if (entry < max_entries) {
-			bases[entry] = node->base_address;
+			bases[entry] = msc->base_address;
 			entry++;
 		}
 
 		seq_puts  (m, "ACPI MPAM MSC Node\n");
 		seq_puts  (m, "\n");
 		seq_printf(m, "  length                        %x\n",
-			   node->length);
+			   msc->length);
 		seq_printf(m, "  interface_type                %x\n",
-			   node->interface_type);
+			   msc->interface_type);
 		seq_printf(m, "  reserved                      %x\n",
-			   node->reserved);
+			   msc->reserved);
 		seq_printf(m, "  identifier                    %x\n",
-			   node->identifier);
+			   msc->identifier);
 		seq_printf(m, "  base_address                  %llx\n",
-			   node->base_address);
+			   msc->base_address);
 		seq_printf(m, "  mmio_size                     %x\n",
-			   node->mmio_size);
+			   msc->mmio_size);
 		seq_printf(m, "  overflow_interrupt            %x\n",
-			   node->overflow_interrupt);
+			   msc->overflow_interrupt);
 		seq_printf(m, "  overflow_interrupt_flags      %x\n",
-			   node->overflow_interrupt_flags);
+			   msc->overflow_interrupt_flags);
 		seq_printf(m, "  reserved1                     %x\n",
-			   node->reserved1);
+			   msc->reserved1);
 		seq_printf(m, "  overflow_interrupt_affinity   %x\n",
-			   node->overflow_interrupt_affinity);
+			   msc->overflow_interrupt_affinity);
 		seq_printf(m, "  error_intrrupt                %x\n",
-			   node->error_interrupt);
+			   msc->error_interrupt);
 		seq_printf(m, "  error_interrupt_flags         %x\n",
-			   node->error_interrupt_flags);
+			   msc->error_interrupt_flags);
 		seq_printf(m, "  reserved2                     %x\n",
-			   node->reserved2);
+			   msc->reserved2);
 		seq_printf(m, "  error_interrupt_affinity      %x\n",
-			   node->error_interrupt_affinity);
+			   msc->error_interrupt_affinity);
 		seq_printf(m, "  max_nrdy_usec                 %x\n",
-			   node->max_nrdy_usec);
+			   msc->max_nrdy_usec);
 		seq_printf(m, "  hardware_id_linked_device     %llx\n",
-			   node->hardware_id_linked_device);
+			   msc->hardware_id_linked_device);
 		seq_printf(m, "  instance_id_linked_device     %x\n",
-			   node->instance_id_linked_device);
-		seq_printf(m, "  num_resouce_nodes             %x\n",
-			   node->num_resouce_nodes);
+			   msc->instance_id_linked_device);
+		seq_printf(m, "  num_resource_nodes            %x\n",
+			   msc->num_resource_nodes);
 		seq_puts  (m, "\n");
 
-		offset += node->length;
+		/* Dump resource nodes */
+		res = (struct acpi_mpam_resource_node *)(offset + sizeof(*msc));
+		for (i = 0; i < msc->num_resource_nodes; i++, res++) {
+			seq_printf(m, "ACPI MPAM Resource Node [%d]\n", i);
+			seq_puts  (m, "\n");
+			seq_printf(m, "  identifier                    %x\n",
+				   res->identifier);
+			seq_printf(m, "  ris_index                     %x\n",
+				   res->ris_index);
+			seq_printf(m, "  num_functional_deps           %x\n",
+				   res->num_functional_deps);
+			switch (res->locator_type) {
+			case ACPI_MPAM_LOCATION_TYPE_PROCESSOR_CACHE:
+				seq_printf(m, "  locator_type                  %s\n",
+					   "processor_cache");
+				seq_printf(m, "  cache_reference               %llx\n",
+					   res->locator.cache_locator.cache_reference);
+				break;
+			case ACPI_MPAM_LOCATION_TYPE_MEMORY:
+				seq_printf(m, "  locator_type                  %s\n",
+					   "memory");
+				seq_printf(m, "  proximity_domain              %llx\n",
+					   res->locator.memory_locator.proximity_domain);
+				break;
+			case ACPI_MPAM_LOCATION_TYPE_SMMU:
+				seq_printf(m, "  locator_type                  %s\n",
+					   "smmu");
+				seq_printf(m, "  smmu_interface                %llx\n",
+					   res->locator.smmu_locator.smmu_interface);
+				break;
+			case ACPI_MPAM_LOCATION_TYPE_MEMORY_CACHE:
+				seq_printf(m, "  locator_type                  %s\n",
+					   "memory_cache");
+				seq_printf(m, "  level                         %x\n",
+					   res->locator.mem_cache_locator.level);
+				seq_printf(m, "  reference                     %x\n",
+					   res->locator.mem_cache_locator.reference);
+				break;
+			case ACPI_MPAM_LOCATION_TYPE_ACPI_DEVICE:
+				seq_printf(m, "  locator_type                  %s\n",
+					   "acpi_device");
+				seq_printf(m, "  acpi_hw_id                    %llx\n",
+					   res->locator.acpi_locator.acpi_hw_id);
+				seq_printf(m, "  acpi_unique_id                %x\n",
+					   res->locator.acpi_locator.acpi_unique_id);
+				break;
+			case ACPI_MPAM_LOCATION_TYPE_INTERCONNECT:
+				seq_printf(m, "  locator_type                  %s\n",
+					   "interconnect");
+				seq_printf(m, "  inter_connect_desc_tbl_off    %llx\n",
+					   res->locator.interconnect_ifc_locator.inter_connect_desc_tbl_off);
+				break;
+			case ACPI_MPAM_LOCATION_TYPE_UNKNOWN:
+			default:
+				seq_printf(m, "  locator_type                  %s\n",
+					   "unknown");
+				seq_printf(m, "  descriptor1                   %llx\n",
+					   res->locator.generic_locator.descriptor1);
+				seq_printf(m, "  descriptor2                   %x\n",
+					   res->locator.generic_locator.descriptor2);
+			}
+
+			seq_puts  (m, "\n");
+		}
+
+		offset += msc->length;
 	}
 
 	if (!entry)
@@ -1727,7 +1793,7 @@ static void dump_show_mm(struct seq_file *m)
 #ifdef CONFIG_KSM
 	seq_printf(m, "kvm_merging_pages:       0x%lx\n", mm->ksm_merging_pages);
 	seq_printf(m, "ksm_rmap_items:          0x%lx\n", mm->ksm_rmap_items);
-	seq_printf(m, "ksm_zero_pages:          0x%lx\n", mm->ksm_zero_pages);
+	seq_printf(m, "ksm_zero_pages:          0x%lx\n", atomic_long_read(&mm->ksm_zero_pages));
 #endif
 	seq_puts(  m, "\n");
 }
