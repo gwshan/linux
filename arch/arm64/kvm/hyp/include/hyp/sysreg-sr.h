@@ -296,7 +296,7 @@ static inline void __mpam_guest_put(void)
 {
 	u64 val, mask = MPAM1_EL1_PMG_D | MPAM1_EL1_PMG_I |
 			MPAM1_EL1_PARTID_D | MPAM1_EL1_PARTID_I;
-	
+
 	if (cpus_support_mpam()) {
 		val = FIELD_GET(mask, read_sysreg_s(SYS_MPAM2_EL2));
 		write_sysreg_el1(val, SYS_MPAM1);
