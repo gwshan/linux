@@ -1559,7 +1559,8 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 
 	if (mpam_has_feature(mpam_feat_mbw_max, rprops)) {
 		if (mpam_has_feature(mpam_feat_mbw_max, cfg))
-			mpam_write_partsel_reg(msc, MBW_MAX, cfg->mbw_max);
+			mpam_write_partsel_reg(msc, MBW_MAX,
+					       MPAMCFG_MBW_MAX_HARDLIM | cfg->mbw_max);
 		else
 			mpam_write_partsel_reg(msc, MBW_MAX, bwa_fract);
 	}
