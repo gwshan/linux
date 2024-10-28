@@ -1573,4 +1573,11 @@ struct kvm_pre_fault_memory {
 	__u64 padding[5];
 };
 
+#define KVM_ARM_SET_MPAM_DATA	_IOW(KVMIO, 0xd6, struct kvm_mpam_data)
+
+struct kvm_mpam_data {
+	__u64 phys_partid_num;
+	__u16 phys_partids[32];
+};
+
 #endif /* __LINUX_KVM_H */

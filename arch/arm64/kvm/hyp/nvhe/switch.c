@@ -343,7 +343,7 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 	__timer_enable_traps(vcpu);
 
 	__debug_switch_to_guest(vcpu);
-	__mpam_guest_load();
+	__mpam_guest_load(vcpu, host_ctxt);
 
 	do {
 		/* Jump in the fire! */
@@ -354,7 +354,7 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 
 	__sysreg_save_state_nvhe(guest_ctxt);
 	__sysreg32_save_state(vcpu);
-	__mpam_guest_put();
+	__mpam_guest_put(vcpu, host_ctxt);
 	__timer_disable_traps(vcpu);
 	__hyp_vgic_save_state(vcpu);
 

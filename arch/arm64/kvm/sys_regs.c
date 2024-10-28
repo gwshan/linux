@@ -30,6 +30,7 @@
 #include <asm/kvm_nested.h>
 #include <asm/perf_event.h>
 #include <asm/sysreg.h>
+#include <asm/mpam.h>
 
 #include <trace/events/kvm.h>
 
@@ -544,12 +545,56 @@ static bool trap_oslar_el1(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+static u64 reset_mpam(struct kvm_vcpu *vcpu,
+		      const struct sys_reg_desc *r)
+{
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_mpam_partids *partids = &kvm->arch.mpam;
+	u64 val = 0ULL;
+
+	/* MPAM1_EL1 */
+	if (r->Op0 == 3 && r->Op1 == 0 &&
+	    r->CRn == 10 && r->CRm == 5 && r->Op2 == 0)
+		val = partids->phys_partid_num == 0 ? 0ULL : MPAM1_EL1_MPAMEN;
+
+	vcpu_write_sys_reg(vcpu, val, r->reg);
+
+	return val;
+}
+
 static bool trap_mpam(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 		      const struct sys_reg_desc *r)
 {
-	kvm_inject_undefined(vcpu);
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_mpam_partids *partids = &kvm->arch.mpam;
+	u64 val = 0ULL;
 
-	return false;
+	/* The MPAM capability hasn't been exposed */
+	if (partids->phys_partid_num == 0)
+		return bad_trap(vcpu, p, r, "MPAM register");
+
+	if (!p->is_write) {
+		if (r->Op0 == 3 && r->Op1 == 0 &&
+		    r->CRn == 10 && r->CRm == 4 &&
+		    r->Op2 == 4) { /* MPAMIDR_EL1 */
+			val = partids->phys_partid_num == 0 ?
+			      0ULL : partids->phys_partid_num - 1;
+		} else {
+			val = vcpu_read_sys_reg(vcpu, r->reg);
+		}
+
+		p->regval = val;
+		return true;
+	}
+
+	/* MPAMIDR_EL1 is read only */
+	if (r->Op0 == 3 && r->Op1 == 0 &&
+	    r->CRn == 10 && r->CRm == 4 &&
+	    r->Op2 == 4)
+		return write_to_read_only(vcpu, p, r);
+
+	vcpu_write_sys_reg(vcpu, p->regval, r->reg);
+	return true;
 }
 
 static bool trap_oslsr_el1(struct kvm_vcpu *vcpu,
@@ -1521,6 +1566,8 @@ static u8 pmuver_to_perfmon(u8 pmuver)
 static u64 __kvm_read_sanitised_id_reg(const struct kvm_vcpu *vcpu,
 				       const struct sys_reg_desc *r)
 {
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_mpam_partids *partids = &kvm->arch.mpam;
 	u32 id = reg_to_encoding(r);
 	u64 val;
 
@@ -1530,9 +1577,16 @@ static u64 __kvm_read_sanitised_id_reg(const struct kvm_vcpu *vcpu,
 	val = read_sanitised_ftr_reg(id);
 
 	switch (id) {
+	case SYS_ID_AA64PFR0_EL1:
+		if (partids->phys_partid_num == 0)
+			val &= ~ARM64_FEATURE_MASK(ID_AA64PFR0_EL1_MPAM);
+		break;
 	case SYS_ID_AA64PFR1_EL1:
 		if (!kvm_has_mte(vcpu->kvm))
 			val &= ~ARM64_FEATURE_MASK(ID_AA64PFR1_EL1_MTE);
+
+		if (partids->phys_partid_num == 0)
+			val &= ~ARM64_FEATURE_MASK(ID_AA64PFR1_EL1_MPAM_frac);
 
 		val &= ~ARM64_FEATURE_MASK(ID_AA64PFR1_EL1_SME);
 		break;
@@ -1694,6 +1748,8 @@ static unsigned int fp8_visibility(const struct kvm_vcpu *vcpu,
 static u64 read_sanitised_id_aa64pfr0_el1(struct kvm_vcpu *vcpu,
 					  const struct sys_reg_desc *rd)
 {
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_mpam_partids *partids = &kvm->arch.mpam;
 	u64 val = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
 
 	if (!vcpu_has_sve(vcpu))
@@ -1723,12 +1779,8 @@ static u64 read_sanitised_id_aa64pfr0_el1(struct kvm_vcpu *vcpu,
 
 	val &= ~ID_AA64PFR0_EL1_AMU_MASK;
 
-	/*
-	 * MPAM is disabled by default as KVM also needs a set of PARTID to
-	 * program the MPAMVPMx_EL2 PARTID remapping registers with. But some
-	 * older kernels let the guest see the ID bit.
-	 */
-	val &= ~ID_AA64PFR0_EL1_MPAM_MASK;
+	if (partids->phys_partid_num == 0)
+		val &= ~ID_AA64PFR0_EL1_MPAM_MASK;
 
 	return val;
 }
@@ -1736,9 +1788,12 @@ static u64 read_sanitised_id_aa64pfr0_el1(struct kvm_vcpu *vcpu,
 static u64 read_sanitised_id_aa64pfr1_el1(struct kvm_vcpu *vcpu,
 					  const struct sys_reg_desc *rd)
 {
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_mpam_partids *partids = &kvm->arch.mpam;
 	u64 val = read_sanitised_ftr_reg(SYS_ID_AA64PFR1_EL1);
 
-	val &= ~ID_AA64PFR1_EL1_MPAM_frac_MASK;
+	if (partids->phys_partid_num == 0)
+		val &= ~ID_AA64PFR1_EL1_MPAM_frac_MASK;
 
 	return val;
 }
@@ -2577,8 +2632,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	{ SYS_DESC(SYS_MPAMIDR_EL1), trap_mpam },
 	{ SYS_DESC(SYS_LORID_EL1), trap_loregion },
 
-	{ SYS_DESC(SYS_MPAM1_EL1), trap_mpam },
-	{ SYS_DESC(SYS_MPAM0_EL1), trap_mpam },
+	{ SYS_DESC(SYS_MPAM1_EL1), trap_mpam, reset_mpam, MPAM1_EL1 },
+	{ SYS_DESC(SYS_MPAM0_EL1), trap_mpam, reset_mpam, MPAM0_EL1 },
+	{ SYS_DESC(SYS_MPAMSM_EL1), trap_mpam, reset_mpam, MPAMSM_EL1 },
 	{ SYS_DESC(SYS_VBAR_EL1), access_rw, reset_val, VBAR_EL1, 0 },
 	{ SYS_DESC(SYS_DISR_EL1), NULL, reset_val, DISR_EL1, 0 },
 
@@ -4654,6 +4710,37 @@ int kvm_vm_ioctl_get_reg_writable_masks(struct kvm *kvm, struct reg_mask_range *
 		if (put_user(val, (masks + KVM_ARM_FEATURE_ID_RANGE_INDEX(encoding))))
 			return -EFAULT;
 	}
+
+	return 0;
+}
+
+int kvm_vm_ioctl_set_mpam_data(struct kvm *kvm, struct kvm_mpam_data *data)
+{
+	struct kvm_mpam_partids *partids = &kvm->arch.mpam;
+	unsigned long max_vpmr;
+
+	if (!cpus_support_mpam() || !mpam_cpus_have_mpam_hcr())
+		return -EPERM;
+
+	/* One partid is required at least */
+	max_vpmr = FIELD_GET(MPAMIDR_EL1_VPMR_MAX_MASK,
+			     read_sanitised_ftr_reg(SYS_MPAMIDR_EL1));
+	if (data->phys_partid_num < 1 ||
+	    data->phys_partid_num > (4 * (max_vpmr + 1)))
+		return -EINVAL;
+
+	mutex_lock(&kvm->arch.config_lock);
+
+	if (kvm_vm_has_ran_once(kvm) || partids->phys_partid_num) {
+		mutex_unlock(&kvm->arch.config_lock);
+		return -EBUSY;
+	}
+
+	partids->phys_partid_num = data->phys_partid_num;
+	memcpy(partids->phys_partids, data->phys_partids,
+	       sizeof(data->phys_partids[0]) * ARRAY_SIZE(data->phys_partids));
+
+	mutex_unlock(&kvm->arch.config_lock);
 
 	return 0;
 }

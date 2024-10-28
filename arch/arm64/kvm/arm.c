@@ -1904,6 +1904,14 @@ int kvm_arch_vm_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 			return -EFAULT;
 		return kvm_vm_ioctl_get_reg_writable_masks(kvm, &range);
 	}
+	case KVM_ARM_SET_MPAM_DATA: {
+		struct kvm_mpam_data mpam_data;
+
+		if (copy_from_user(&mpam_data, argp, sizeof(mpam_data)))
+			return -EFAULT;
+
+		return kvm_vm_ioctl_set_mpam_data(kvm, &mpam_data);
+	}
 	default:
 		return -EINVAL;
 	}

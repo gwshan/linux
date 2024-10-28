@@ -304,30 +304,124 @@ static inline void __sysreg32_restore_state(struct kvm_vcpu *vcpu)
 		write_sysreg(__vcpu_sys_reg(vcpu, DBGVCR32_EL2), dbgvcr32_el2);
 }
 
-/*
- * The _EL0 value was written by the host's context switch, copy this into the
- * guest's EL1.
- */
-static inline void __mpam_guest_load(void)
+static inline void __mpam_guest_load(struct kvm_vcpu *vcpu,
+				     struct kvm_cpu_context *ctxt)
 {
-	if (cpus_support_mpam())
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_mpam_partids *partids = &kvm->arch.mpam;
+	unsigned long val;
+
+	if (!cpus_support_mpam())
+		return;
+
+	/*
+	 * The _EL0 value was written by the host's context switch, copy
+	 * this into the guest's EL1.
+	 */
+	if (partids->phys_partid_num == 0) {
 		write_sysreg_el1(read_sysreg_s(SYS_MPAM0_EL1), SYS_MPAM1);
+		return;
+	}
+
+	ctxt_sys_reg(ctxt, MPAM0_EL1) = read_sysreg_s(SYS_MPAM0_EL1);
+	ctxt_sys_reg(ctxt, MPAM1_EL1) = read_sysreg_el1(SYS_MPAM1);
+	ctxt_sys_reg(ctxt, MPAMSM_EL1) = read_sysreg_s(SYS_MPAMSM_EL1);
+
+	switch (partids->phys_partid_num) {
+	case 28 ... 31:
+		val = FIELD_PREP(GENMASK_ULL(63, 48), partids->phys_partids[31]) |
+		      FIELD_PREP(GENMASK_ULL(47, 32), partids->phys_partids[30]) |
+		      FIELD_PREP(GENMASK_ULL(31, 16), partids->phys_partids[29]) |
+		      FIELD_PREP(GENMASK_ULL(15, 0), partids->phys_partids[28]);
+		write_sysreg_s(val, SYS_MPAMVPM7_EL2);
+		fallthrough;
+	case 24 ... 27:
+		val = FIELD_PREP(GENMASK_ULL(63, 48), partids->phys_partids[27]) |
+		      FIELD_PREP(GENMASK_ULL(47, 32), partids->phys_partids[26]) |
+		      FIELD_PREP(GENMASK_ULL(31, 16), partids->phys_partids[25]) |
+		      FIELD_PREP(GENMASK_ULL(15, 0), partids->phys_partids[24]);
+		write_sysreg_s(val, SYS_MPAMVPM6_EL2);
+		fallthrough;
+	case 20 ... 23:
+		val = FIELD_PREP(GENMASK_ULL(63, 48), partids->phys_partids[23]) |
+		      FIELD_PREP(GENMASK_ULL(47, 32), partids->phys_partids[22]) |
+		      FIELD_PREP(GENMASK_ULL(31, 16), partids->phys_partids[21]) |
+		      FIELD_PREP(GENMASK_ULL(15, 0), partids->phys_partids[20]);
+		write_sysreg_s(val, SYS_MPAMVPM5_EL2);
+		fallthrough;
+	case 16 ... 19:
+		val = FIELD_PREP(GENMASK_ULL(63, 48), partids->phys_partids[19]) |
+		      FIELD_PREP(GENMASK_ULL(47, 32), partids->phys_partids[18]) |
+		      FIELD_PREP(GENMASK_ULL(31, 16), partids->phys_partids[17]) |
+		      FIELD_PREP(GENMASK_ULL(15, 0), partids->phys_partids[16]);
+		write_sysreg_s(val, SYS_MPAMVPM4_EL2);
+		fallthrough;
+	case 12 ... 15:
+		val = FIELD_PREP(GENMASK_ULL(63, 48), partids->phys_partids[15]) |
+		      FIELD_PREP(GENMASK_ULL(47, 32), partids->phys_partids[14]) |
+		      FIELD_PREP(GENMASK_ULL(31, 16), partids->phys_partids[13]) |
+		      FIELD_PREP(GENMASK_ULL(15, 0), partids->phys_partids[12]);
+		write_sysreg_s(val, SYS_MPAMVPM3_EL2);
+		fallthrough;
+	case 8 ... 11:
+		val = FIELD_PREP(GENMASK_ULL(63, 48), partids->phys_partids[11]) |
+		      FIELD_PREP(GENMASK_ULL(47, 32), partids->phys_partids[10]) |
+		      FIELD_PREP(GENMASK_ULL(31, 16), partids->phys_partids[9]) |
+		      FIELD_PREP(GENMASK_ULL(15, 0), partids->phys_partids[8]);
+		write_sysreg_s(val, SYS_MPAMVPM2_EL2);
+		fallthrough;
+	case 4 ... 7:
+		val = FIELD_PREP(GENMASK_ULL(63, 48), partids->phys_partids[7]) |
+		      FIELD_PREP(GENMASK_ULL(47, 32), partids->phys_partids[6]) |
+		      FIELD_PREP(GENMASK_ULL(31, 16), partids->phys_partids[5]) |
+		      FIELD_PREP(GENMASK_ULL(15, 0), partids->phys_partids[4]);
+		write_sysreg_s(val, SYS_MPAMVPM1_EL2);
+		fallthrough;
+	case 0 ... 3:
+		val = FIELD_PREP(GENMASK_ULL(63, 48), partids->phys_partids[3]) |
+		      FIELD_PREP(GENMASK_ULL(47, 32), partids->phys_partids[2]) |
+		      FIELD_PREP(GENMASK_ULL(31, 16), partids->phys_partids[1]) |
+		      FIELD_PREP(GENMASK_ULL(15, 0), partids->phys_partids[0]);
+		write_sysreg_s(val, SYS_MPAMVPM0_EL2);
+	}
+
+	write_sysreg_s(GENMASK_ULL(partids->phys_partid_num - 1, 0), SYS_MPAMVPMV_EL2);
+	write_sysreg_s(__vcpu_sys_reg(vcpu, MPAM0_EL1), SYS_MPAM0_EL1);
+	write_sysreg_el1(__vcpu_sys_reg(vcpu, MPAM1_EL1), SYS_MPAM1);
+	write_sysreg_s(__vcpu_sys_reg(vcpu, MPAMSM_EL1), SYS_MPAMSM_EL1);
 }
 
-/*
- * Copy the _EL2 register back to _EL1, clearing any trap bits EL2 may have set.
- * nVHE world-switch copies the _EL1 register to _EL2. A VHE host writes to the
- * _EL2 register as it is aliased by the hardware when TGE is set.
- */
-static inline void __mpam_guest_put(void)
+static inline void __mpam_guest_put(struct kvm_vcpu *vcpu,
+				    struct kvm_cpu_context *ctxt)
 {
-	u64 val, mask = MPAM1_EL1_PMG_D | MPAM1_EL1_PMG_I |
-			MPAM1_EL1_PARTID_D | MPAM1_EL1_PARTID_I;
-	
-	if (cpus_support_mpam()) {
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_mpam_partids *partids = &kvm->arch.mpam;
+	u64 val, mask;
+
+	if (!cpus_support_mpam())
+		return;
+
+	/*
+	 * Copy the _EL2 register back to _EL1, clearing any trap bits
+	 * EL2 may have set. nVHE world-switch copies the _EL1 register
+	 * to _EL2. A VHE host writes to the _EL2 register as it is
+	 * aliased by the hardware when TGE is set.
+	 */
+	if (partids->phys_partid_num == 0) {
+		mask = MPAM1_EL1_PMG_D | MPAM1_EL1_PMG_I |
+		       MPAM1_EL1_PARTID_D | MPAM1_EL1_PARTID_I;
 		val = FIELD_GET(mask, read_sysreg_s(SYS_MPAM2_EL2));
 		write_sysreg_el1(val, SYS_MPAM1);
+		return;
 	}
+
+	__vcpu_sys_reg(vcpu, MPAM0_EL1) = read_sysreg_s(SYS_MPAM0_EL1);
+	__vcpu_sys_reg(vcpu, MPAM1_EL1) = read_sysreg_el1(SYS_MPAM1);
+	__vcpu_sys_reg(vcpu, MPAMSM_EL1) = read_sysreg_s(SYS_MPAMSM_EL1);
+
+	write_sysreg_s(ctxt_sys_reg(ctxt, MPAM0_EL1), SYS_MPAM0_EL1);
+	write_sysreg_el1(ctxt_sys_reg(ctxt, MPAM1_EL1), SYS_MPAM1);
+	write_sysreg_s(ctxt_sys_reg(ctxt, MPAMSM_EL1), SYS_MPAMSM_EL1);
 }
 
 #endif /* __ARM64_KVM_HYP_SYSREG_SR_H__ */

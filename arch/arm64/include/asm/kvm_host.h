@@ -271,6 +271,11 @@ enum fgt_group_id {
 	__NR_FGT_GROUP_IDS__
 };
 
+struct kvm_mpam_partids {
+	unsigned int	phys_partid_num;
+	unsigned short	phys_partids[32];
+};
+
 struct kvm_arch {
 	struct kvm_s2_mmu mmu;
 
@@ -340,6 +345,9 @@ struct kvm_arch {
 	 */
 	unsigned long *pmu_filter;
 	struct arm_pmu *arm_pmu;
+
+	/* MPAM physical partition ids */
+	struct kvm_mpam_partids mpam;
 
 	cpumask_var_t supported_cpus;
 
@@ -451,6 +459,11 @@ enum vcpu_sysreg {
 	/* FP/SIMD/SVE */
 	SVCR,
 	FPMR,
+
+	/* MPAM registers */
+	MPAM0_EL1,
+	MPAM1_EL1,
+	MPAMSM_EL1,
 
 	/* 32bit specific registers. */
 	DACR32_EL2,	/* Domain Access Control Register */
@@ -1049,6 +1062,9 @@ static inline bool __vcpu_read_sys_reg_from_cpu(int reg, u64 *val)
 	case IFSR32_EL2:	*val = read_sysreg_s(SYS_IFSR32_EL2);	break;
 	case DBGVCR32_EL2:	*val = read_sysreg_s(SYS_DBGVCR32_EL2);	break;
 	case ZCR_EL1:		*val = read_sysreg_s(SYS_ZCR_EL12);	break;
+	case MPAM0_EL1:		*val = read_sysreg_s(SYS_MPAM0_EL1);	break;
+	case MPAM1_EL1:		*val = read_sysreg_s(SYS_MPAM1_EL12);	break;
+	case MPAMSM_EL1:	*val = read_sysreg_s(SYS_MPAMSM_EL1);	break;
 	default:		return false;
 	}
 
@@ -1095,6 +1111,9 @@ static inline bool __vcpu_write_sys_reg_to_cpu(u64 val, int reg)
 	case IFSR32_EL2:	write_sysreg_s(val, SYS_IFSR32_EL2);	break;
 	case DBGVCR32_EL2:	write_sysreg_s(val, SYS_DBGVCR32_EL2);	break;
 	case ZCR_EL1:		write_sysreg_s(val, SYS_ZCR_EL12);	break;
+	case MPAM0_EL1:		write_sysreg_s(val, SYS_MPAM0_EL1);	break;
+	case MPAM1_EL1:		write_sysreg_s(val, SYS_MPAM1_EL12);	break;
+	case MPAMSM_EL1:	write_sysreg_s(val, SYS_MPAMSM_EL1);	break;
 	default:		return false;
 	}
 
@@ -1330,6 +1349,7 @@ int kvm_vm_ioctl_set_counter_offset(struct kvm *kvm,
 				    struct kvm_arm_counter_offset *offset);
 int kvm_vm_ioctl_get_reg_writable_masks(struct kvm *kvm,
 					struct reg_mask_range *range);
+int kvm_vm_ioctl_set_mpam_data(struct kvm *kvm, struct kvm_mpam_data *data);
 
 /* Guest/host FPSIMD coordination helpers */
 int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu);
