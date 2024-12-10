@@ -209,8 +209,10 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	mutex_unlock(&kvm->lock);
 #endif
 
-	if (type & ~(KVM_VM_TYPE_ARM_MASK | KVM_VM_TYPE_ARM_IPA_SIZE_MASK))
+	if (type & ~(KVM_VM_TYPE_ARM_MASK | KVM_VM_TYPE_ARM_IPA_SIZE_MASK)) {
+		pr_warn("%s: Invalid type=0x%lx\n", __func__, type);
 		return -EINVAL;
+	}
 
 	switch (type & KVM_VM_TYPE_ARM_MASK) {
 	case KVM_VM_TYPE_ARM_NORMAL:
@@ -219,22 +221,28 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 		kvm->arch.is_realm = true;
 		if (!kvm_is_realm(kvm)) {
 			/* Realm support unavailable */
+			pr_warn("%s: false from kvm_is_realm()\n", __func__);
 			return -EINVAL;
 		}
 		break;
 	default:
+		pr_warn("%s: Unknown type=0x%lx\n", __func__, type);
 		return -EINVAL;
 	}
 
 	kvm_init_nested(kvm);
 
 	ret = kvm_share_hyp(kvm, kvm + 1);
-	if (ret)
+	if (ret) {
+		pr_warn("%s: Error %d from kvm_share_hyp()\n", __func__, ret);
 		return ret;
+	}
 
 	ret = pkvm_init_host_vm(kvm);
-	if (ret)
+	if (ret) {
+		pr_warn("%s: Error %d from pkvm_init_host_vm()\n", __func__, ret);
 		goto err_unshare_kvm;
+	}
 
 	if (!zalloc_cpumask_var(&kvm->arch.supported_cpus, GFP_KERNEL_ACCOUNT)) {
 		ret = -ENOMEM;
@@ -243,8 +251,10 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	cpumask_copy(kvm->arch.supported_cpus, cpu_possible_mask);
 
 	ret = kvm_init_stage2_mmu(kvm, &kvm->arch.mmu, type);
-	if (ret)
+	if (ret) {
+		pr_warn("%s: Error %d from kvm_init_stage2_mmu()\n", __func__, ret);
 		goto err_free_cpumask;
+	}
 
 	kvm_vgic_early_init(kvm);
 
@@ -260,8 +270,10 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	/* Initialise the realm bits after the generic bits are enabled */
 	if (kvm_is_realm(kvm)) {
 		ret = kvm_init_realm_vm(kvm);
-		if (ret)
+		if (ret) {
+			pr_warn("%s: Error %d from kvm_init_realm_vm()\n", __func__, ret);
 			goto err_free_cpumask;
+		}
 	}
 
 	return 0;

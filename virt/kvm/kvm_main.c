@@ -5498,9 +5498,12 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 	struct kvm *kvm;
 	struct file *file;
 
+	pr_info("%s: type=0x%lx\n", __func__, type);
 	fd = get_unused_fd_flags(O_CLOEXEC);
-	if (fd < 0)
+	if (fd < 0) {
+		pr_warn("%s: Error %d from get_unused_fd_flags()\n", __func__, fd);
 		return fd;
+	}
 
 	snprintf(fdname, sizeof(fdname), "%d", fd);
 

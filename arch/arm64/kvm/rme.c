@@ -686,11 +686,17 @@ static int realm_create_protected_data_page(struct realm *realm,
 	dst_phys = page_to_phys(dst_page);
 	src_phys = page_to_phys(src_page);
 
-	if (rmi_granule_delegate(dst_phys))
+	if (rmi_granule_delegate(dst_phys)) {
+		pr_info("%s: Fail to rmi_granule_delegate(0x%lx)\n", __func__, ipa);
 		return -ENXIO;
+	}
 
 	ret = rmi_data_create(virt_to_phys(realm->rd), dst_phys, ipa, src_phys,
 			      flags);
+	if (RMI_RETURN_STATUS(ret) != RMI_SUCCESS &&
+	    RMI_RETURN_STATUS(ret) != RMI_ERROR_RTT)
+		pr_info("%s: Error %d from rmi_data_create(0, 0x%lx)\n",
+			__func__, ret, ipa);
 
 	if (RMI_RETURN_STATUS(ret) == RMI_ERROR_RTT) {
 		/* Create missing RTTs and retry */
@@ -698,11 +704,17 @@ static int realm_create_protected_data_page(struct realm *realm,
 
 		ret = realm_create_rtt_levels(realm, ipa, level,
 					      RME_RTT_MAX_LEVEL, NULL);
-		if (ret)
+		if (ret) {
+			pr_info("%s: Error %d from realm_create_rtt_levels(0x%lx, %d)\n",
+				__func__, ret, ipa, level);
 			goto err;
+		}
 
 		ret = rmi_data_create(virt_to_phys(realm->rd), dst_phys, ipa,
 				      src_phys, flags);
+		if (ret)
+			pr_info("%s: Error %d from rmi_data_create(1, 0x%lx)\n",
+				__func__, ret, ipa);
 	}
 
 	if (!ret)
@@ -918,6 +930,9 @@ static int populate_par_region(struct kvm *kvm,
 	int ret = 0;
 	unsigned long data_flags = 0;
 
+	pr_info("%s: [0x%llx 0x%llx] flags=0x%x\n",
+		__func__, ipa_base, ipa_end, flags);
+
 	base_gfn = gpa_to_gfn(ipa_base);
 	end_gfn = gpa_to_gfn(ipa_end);
 
@@ -1011,8 +1026,11 @@ static int populate_par_region(struct kvm *kvm,
 			ret = kvm_gmem_get_pfn(kvm, memslot,
 					       page_ipa >> PAGE_SHIFT,
 					       &priv_pfn, &order);
-			if (ret)
+			if (ret) {
+				pr_info("%s: Error %d from kvm_gmem_get_pfn(0x%llx)\n",
+					__func__, ret, page_ipa);
 				break;
+			}
 
 			ret = realm_create_protected_data_page(realm, page_ipa,
 							       pfn_to_page(priv_pfn),
