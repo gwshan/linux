@@ -732,9 +732,13 @@ static inline gpa_t kvm_gpa_from_fault(struct kvm *kvm, phys_addr_t fault_ipa)
 
 static inline bool vcpu_is_rec(struct kvm_vcpu *vcpu)
 {
+#if 1
+	return kvm_is_realm(vcpu->kvm);
+#else
 	if (static_branch_unlikely(&kvm_rme_is_available))
 		return vcpu_has_feature(vcpu, KVM_ARM_VCPU_REC);
 	return false;
+#endif
 }
 
 static inline bool kvm_arm_vcpu_rec_finalized(struct kvm_vcpu *vcpu)
