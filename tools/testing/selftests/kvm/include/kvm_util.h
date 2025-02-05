@@ -1072,6 +1072,9 @@ static inline void virt_pgd_alloc(struct kvm_vm *vm)
  * Within @vm, creates a virtual translation for the page starting
  * at @vaddr to the page starting at @paddr.
  */
+#ifdef __aarch64__
+void __virt_pg_map(struct kvm_vm *vm, uint64_t vaddr, uint64_t paddr, uint64_t flags);
+#endif
 void virt_arch_pg_map(struct kvm_vm *vm, uint64_t vaddr, uint64_t paddr);
 
 static inline void virt_pg_map(struct kvm_vm *vm, uint64_t vaddr, uint64_t paddr)
