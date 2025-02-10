@@ -144,6 +144,7 @@ static int find_map_level(struct realm *realm,
 	return level;
 }
 
+/* FIXME: This conflates pages and granules */
 static phys_addr_t alloc_delegated_granule(struct kvm_mmu_memory_cache *mc)
 {
 	phys_addr_t phys = PHYS_ADDR_MAX;
@@ -171,6 +172,7 @@ out:
 	return phys;
 }
 
+/* FIXME: This conflates pages and granules */
 static void free_delegated_granule(phys_addr_t phys)
 {
 	if (WARN_ON(rmi_granule_undelegate(phys))) {
@@ -1694,10 +1696,6 @@ int kvm_init_realm_vm(struct kvm *kvm)
 
 void kvm_init_rme(void)
 {
-	if (PAGE_SIZE != SZ_4K)
-		/* Only 4k page size on the host is supported */
-		return;
-
 	if (rmi_check_version())
 		/* Continue without realm support */
 		return;
