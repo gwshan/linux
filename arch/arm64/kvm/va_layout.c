@@ -62,12 +62,20 @@ __init void kvm_compute_layout(void)
 	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
 	u64 hyp_va_msb;
 
+	pr_info("===========================================\n");
+	
 	/* Where is my RAM region? */
 	hyp_va_msb  = idmap_addr & BIT(vabits_actual - 1);
 	hyp_va_msb ^= BIT(vabits_actual - 1);
+	pr_info("%s: hyp_va_msb=0x%016lx, idmap_addr=0x%016lx, vabits_actual=%ld\n",
+		__func__, (unsigned long)hyp_va_msb, (unsigned long)idmap_addr,
+		(unsigned long)vabits_actual);
 
 	tag_lsb = fls64((u64)phys_to_virt(memblock_start_of_DRAM()) ^
 			(u64)(high_memory - 1));
+	pr_info("%s: tag_lsb=%d, low=0x%016lx, high=0x%016lx\n",
+		__func__, tag_lsb, (unsigned long)phys_to_virt(memblock_start_of_DRAM()),
+		(unsigned long)(high_memory - 1));
 
 	va_mask = GENMASK_ULL(tag_lsb - 1, 0);
 	tag_val = hyp_va_msb;

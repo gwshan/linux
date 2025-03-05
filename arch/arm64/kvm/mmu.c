@@ -2053,9 +2053,10 @@ int __init kvm_mmu_init(u32 *hyp_va_bits)
 	kernel_bits = vabits_actual;
 	*hyp_va_bits = max(idmap_bits, kernel_bits);
 
-	kvm_debug("Using %u-bit virtual addresses at EL2\n", *hyp_va_bits);
-	kvm_debug("IDMAP page: %lx\n", hyp_idmap_start);
-	kvm_debug("HYP VA range: %lx:%lx\n",
+	kvm_info("%s: Using %u-bit virtual addresses at EL2\n", __func__, *hyp_va_bits);
+	kvm_info("%s: IDMAP page: %lx\n", __func__, hyp_idmap_start);
+	kvm_info("%s: HYP VA range: %lx:%lx\n",
+		  __func__, 
 		  kern_hyp_va(PAGE_OFFSET),
 		  kern_hyp_va((unsigned long)high_memory - 1));
 

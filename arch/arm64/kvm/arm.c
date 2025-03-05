@@ -2750,6 +2750,9 @@ static __init int kvm_arm_init(void)
 	int err;
 	bool in_hyp_mode;
 
+	pr_info("==================================================\n");
+	pr_info("\n");
+
 	if (!is_hyp_mode_available()) {
 		kvm_info("HYP mode not available\n");
 		return -ENODEV;
@@ -2767,6 +2770,10 @@ static __init int kvm_arm_init(void)
 	}
 
 	in_hyp_mode = is_kernel_in_hyp_mode();
+	pr_info("%s: in_hyp_mode:        %s\n",
+		__func__, in_hyp_mode ? "yes" : "no");
+	pr_info("%s: CAP_ARM64_KVM_HVHE: %s\n",
+		__func__, cpus_have_final_cap(ARM64_KVM_HVHE) ? "yes" : "no");
 
 	if (cpus_have_final_cap(ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE) ||
 	    cpus_have_final_cap(ARM64_WORKAROUND_1508412))
