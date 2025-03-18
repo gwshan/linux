@@ -1,0 +1,77 @@
+#!/usr/bin/env bpftrace
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ * Dump PTE for the specified process and virtual address. This script
+ * works based on the assumption that we have 4 levels in the page table
+ * with the traditional configuration in RHEL9 guest kernel.
+ *
+ *    CONFIG_ARM64_VA_BITS_48=y
+ *    CONFIG_ARM64_PAGE_SHIFT=12
+ *    CONFIG_PGTABLE_LEVELS=4
+ *
+ * Copyright (C) 2023  Red Hat, Inc.
+ *
+ * Author: Gavin Shan <gshan@redhat.com>
+ */
+
+BEGIN {
+    if ($# != 3) {
+       printf("Usage: ./pte.bt <comm> <address> <len>\n");
+       exit();
+    }
+}
+
+iter:task {
+    /*
+     * For RHEL guest, the physical memory always starts from 1GB,
+     * determined by QEMU. The virtual memory always starts from
+     * PAGE_OFFSET, determined by guest kernel.
+     */
+    $phys_base = 0x40000000;
+    $virt_base = 0xffff000000000000;
+
+    if (!strncmp(ctx->task->comm, str($1), 4)) {
+        printf("----------------------------------------\n");
+        printf("pid: %d    <%s>\n", ctx->task->pid, ctx->task->comm);
+        printf("\n");
+
+        $addr = $2;
+        $end = $addr + $3;
+        while ($addr < $end) {
+            printf("---> addr=0x%lx\n", $addr);
+
+            $pgd = (int64)(ctx->task->mm->pgd);
+            $pgd = $pgd + (8 * (($addr >> 39) & 0x1ff));
+            printf("  PGD: 0x%016lx\n", *($pgd));
+            if (*($pgd) & 0x3 != 0x3) {
+                $addr = $addr + (1 << 39);
+                continue;
+            }
+
+            $pud = (*((int64 *)$pgd) & 0xfffffffff000) - $phys_base + $virt_base;
+            $pud = $pud + (8 * (($addr >> 30) & 0x1ff));
+            printf("  PUD: 0x%016lx\n", *($pud));
+            if (*($pud) & 0x3 != 0x3) {
+                $addr = $addr + (1 << 30);
+                continue;
+            }
+
+            $pmd = (*((int64 *)$pud) & 0xfffffffff000) - $phys_base + $virt_base;
+            $pmd = $pmd + (8 * (($addr >> 21) & 0x1ff));
+            printf("  PMD: 0x%016lx\n", *($pmd));
+            if (*($pud) & 0x3 != 0x3) {
+                $addr = $addr + (1 << 21);
+                continue;
+            }
+
+            $pte = (*((int64 *)$pmd) & 0xfffffffff000) - $phys_base + $virt_base;
+            $pte = $pte + (8 * (($addr >> 12) & 0x1ff));
+            printf("  PTE: 0x%016lx\n", *($pte));
+            $addr = $addr + (1 << 12);
+        }
+    }
+}
+
+END {
+    printf("----------------------------------------\n");
+}
