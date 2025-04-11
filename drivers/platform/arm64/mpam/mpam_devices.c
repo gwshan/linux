@@ -3067,6 +3067,7 @@ static mpam_features_t mpam_update_config(struct mpam_config *cfg,
 	maybe_update_config(cfg, mpam_feat_cpor_part, newcfg, cpbm, changes);
 	maybe_update_config(cfg, mpam_feat_mbw_part, newcfg, mbw_pbm, changes);
 	maybe_update_config(cfg, mpam_feat_mbw_max, newcfg, mbw_max, changes);
+	maybe_update_config(cfg, mpam_feat_mbw_min, newcfg, mbw_min, changes);
 
 	return changes;
 }
