@@ -484,28 +484,27 @@ int mpam_get_cpumask_from_cache_id(unsigned long cache_id, u32 cache_level,
 			return -ENOENT;
 		}
 
-		while ((iter = of_find_next_cache_node(iter))) {
+		while (1) {
+			struct device_node *prev __free(device_node) = iter;
+			iter = of_find_next_cache_node(iter);
+			if (!iter)
+				break;
+
 			err = of_property_read_u32(iter, "cache-level",
 						   &iter_level);
-			if (err || iter_level != cache_level) {
-				of_node_put(iter);
+			if (err || iter_level != cache_level)
 				continue;
-			}
 
 			/*
 			 * get_cpu_cacheinfo_id() isn't ready until sometime
 			 * during device_initcall(). Use cache_of_get_id().
 			 */
 			iter_cache_id = cache_of_get_id(iter);
-			if (cache_id == ~0UL) {
-				of_node_put(iter);
+			if (cache_id == ~0UL)
 				continue;
-			}
 
 			if (iter_cache_id == cache_id)
 				cpumask_set_cpu(cpu, affinity);
-
-			of_node_put(iter);
 		}
 	}
 
