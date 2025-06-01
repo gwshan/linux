@@ -568,7 +568,8 @@ static int __kprobes do_page_fault(unsigned long far, unsigned long esr,
 	int si_code;
 	int pkey = -1;
 
-	if (kprobe_page_fault(regs, esr))
+	/* kprobes don't want to hook the spurious faults */
+	if (WARN_ON_ONCE(kprobe_page_fault(regs, esr)))
 		return 0;
 
 	/*
