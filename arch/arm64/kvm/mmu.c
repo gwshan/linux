@@ -1093,7 +1093,7 @@ void kvm_free_stage2_pgd(struct kvm_s2_mmu *mmu)
 	     kvm_realm_state(kvm) != REALM_STATE_NONE)) {
 		struct realm *realm = &kvm->arch.realm;
 
-		kvm_stage2_unmap_range(mmu, 0, BIT(realm->ia_bits - 1), false);
+		kvm_stage2_unmap_range(mmu, 0, BIT(realm->ia_bits - 1), true);
 		write_unlock(&kvm->mmu_lock);
 		kvm_realm_destroy_rtts(kvm, pgt->ia_bits);
 
