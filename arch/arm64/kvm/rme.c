@@ -1125,6 +1125,7 @@ static int kvm_populate_realm(struct kvm *kvm,
 	 * Perform the population in parts to ensure locks are not held for too
 	 * long
 	 */
+	pr_info("%s: [0x%llx  0x%llx]\n", __func__, ipa_base, ipa_end);
 	while (ipa_base < ipa_end) {
 		phys_addr_t end = min(ipa_end, ipa_base + SZ_2M);
 
@@ -1247,6 +1248,7 @@ static int kvm_init_ipa_range_realm(struct kvm *kvm,
 	if (kvm_realm_state(kvm) != REALM_STATE_NEW)
 		return -EPERM;
 
+	pr_info("%s: [0x%llx   0x%llx]\n", __func__, addr, end);
 	return realm_init_ipa_state(kvm, addr, end);
 }
 
