@@ -544,6 +544,10 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
 	int head;
 	bool indirect;
 
+	pr_info("%s: vq=0x%lx, total_sg=%d, out_sgs=%d, in_sgs=%d, data=0x%lx, ctx=0x%lx, premapped=%d\n",
+		__func__, (unsigned long)_vq, total_sg, out_sgs, in_sgs,
+		(unsigned long)data, (unsigned long)ctx, (int)premapped);
+
 	START_USE(vq);
 
 	BUG_ON(data == NULL);
@@ -560,9 +564,11 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
 
 	head = vq->free_head;
 
-	if (virtqueue_use_indirect(vq, total_sg))
+	if (virtqueue_use_indirect(vq, total_sg)) {
+		pr_info("%s: Use indirect mode\n", __func__);
 		desc = alloc_indirect_split(_vq, total_sg, gfp);
-	else {
+	} else {
+		pr_info("%s: Use direct mode\n", __func__);
 		desc = NULL;
 		WARN_ON_ONCE(total_sg > vq->split.vring.num && !vq->indirect);
 	}
@@ -2277,6 +2283,10 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
 
+	pr_info("%s: vq=0x%lx, total_sg=%d, out_sg=%d, in_sg=%d, data=0x%lx, ctx=0x%lx, premapped=%d\n",
+		__func__, (unsigned long)_vq, total_sg, out_sgs, in_sgs,
+		(unsigned long)data, (unsigned long)ctx, (int)premapped);
+
 	return vq->packed_ring ? virtqueue_add_packed(_vq, sgs, total_sg,
 					out_sgs, in_sgs, data, ctx, premapped, gfp) :
 				 virtqueue_add_split(_vq, sgs, total_sg,
@@ -2305,6 +2315,9 @@ int virtqueue_add_sgs(struct virtqueue *_vq,
 		      gfp_t gfp)
 {
 	unsigned int i, total_sg = 0;
+
+	pr_info("%s: vq=0x%lx, out_sgs=%d, in_sgs=%d, data=0x%lx\n",
+		__func__, (unsigned long)_vq, out_sgs, in_sgs, (unsigned long)data);
 
 	/* Count them first. */
 	for (i = 0; i < out_sgs + in_sgs; i++) {

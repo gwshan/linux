@@ -337,6 +337,8 @@ static inline void virtblk_request_done(struct request *req)
 	blk_status_t status = virtblk_result(virtblk_vbr_status(vbr));
 	struct virtio_blk *vblk = req->mq_hctx->queue->queuedata;
 
+	pr_info("%s: enter\n", __func__);
+
 	virtblk_unmap_data(req, vbr);
 	virtblk_cleanup_cmd(req);
 
@@ -379,6 +381,8 @@ static void virtio_commit_rqs(struct blk_mq_hw_ctx *hctx)
 	struct virtio_blk *vblk = hctx->queue->queuedata;
 	struct virtio_blk_vq *vq = &vblk->vqs[hctx->queue_num];
 	bool kick;
+
+	pr_info("%s: enter\n", __func__);
 
 	spin_lock_irq(&vq->lock);
 	kick = virtqueue_kick_prepare(vq->vq);
@@ -435,6 +439,8 @@ static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 	blk_status_t status;
 	int err;
 
+	pr_info("%s: enter\n", __func__);
+
 	status = virtblk_prep_rq(hctx, vblk, req, vbr);
 	if (unlikely(status))
 		return status;
@@ -485,6 +491,7 @@ static void virtblk_add_req_batch(struct virtio_blk_vq *vq,
 
 		err = virtblk_add_req(vq->vq, vbr);
 		if (err) {
+			pr_err("%s: Error from virtblk_add_req()\n", __func__);
 			virtblk_unmap_data(req, vbr);
 			virtblk_cleanup_cmd(req);
 			blk_mq_requeue_request(req, true);
@@ -494,8 +501,10 @@ static void virtblk_add_req_batch(struct virtio_blk_vq *vq,
 	kick = virtqueue_kick_prepare(vq->vq);
 	spin_unlock_irqrestore(&vq->lock, flags);
 
-	if (kick)
+	if (kick) {
+		pr_info("%s: Call virtqueue_notify()\n", __func__);
 		virtqueue_notify(vq->vq);
+	}
 }
 
 static void virtio_queue_rqs(struct rq_list *rqlist)
@@ -504,6 +513,8 @@ static void virtio_queue_rqs(struct rq_list *rqlist)
 	struct rq_list requeue_list = { };
 	struct virtio_blk_vq *vq = NULL;
 	struct request *req;
+
+	pr_info("%s: enter\n", __func__);
 
 	while ((req = rq_list_pop(rqlist))) {
 		struct virtio_blk_vq *this_vq = get_virtio_blk_vq(req->mq_hctx);
@@ -1160,6 +1171,8 @@ static void virtblk_map_queues(struct blk_mq_tag_set *set)
 	struct virtio_blk *vblk = set->driver_data;
 	int i, qoff;
 
+	pr_info("%s: enter\n", __func__);
+
 	for (i = 0, qoff = 0; i < set->nr_maps; i++) {
 		struct blk_mq_queue_map *map = &set->map[i];
 
@@ -1202,6 +1215,8 @@ static int virtblk_poll(struct blk_mq_hw_ctx *hctx, struct io_comp_batch *iob)
 	unsigned long flags;
 	unsigned int len;
 	int found = 0;
+
+	pr_info("%s: enter\n", __func__);
 
 	spin_lock_irqsave(&vq->lock, flags);
 
