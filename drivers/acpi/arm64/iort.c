@@ -547,7 +547,13 @@ static struct acpi_iort_node *iort_node_map_platform_id(
 
 static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
 {
+	static bool iort_dump_stack;
 	struct pci_bus *pbus;
+
+	if (!iort_dump_stack) {
+		iort_dump_stack = true;
+		dump_stack();
+	}
 
 	if (!dev_is_pci(dev)) {
 		struct acpi_iort_node *node;

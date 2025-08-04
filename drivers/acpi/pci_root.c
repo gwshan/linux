@@ -648,6 +648,10 @@ static int acpi_pci_root_add(struct acpi_device *device,
 	bool hotadd = system_state == SYSTEM_RUNNING;
 	const char *acpi_hid;
 
+	pr_info("\n");
+	pr_info("==============================================================\n");
+	pr_info("%s: hotadd=%s\n", __func__, hotadd ? "yes" : "no");
+
 	root = kzalloc(sizeof(struct acpi_pci_root), GFP_KERNEL);
 	if (!root)
 		return -ENOMEM;
