@@ -3243,8 +3243,7 @@ static void mpam_extend_config(struct mpam_class *class, struct mpam_config *cfg
 	 *
 	 * Resctrl can only configure the MAX.
 	 */
-	if (mpam_has_feature(mpam_feat_mbw_max, cfg) &&
-	    !mpam_has_feature(mpam_feat_mbw_min, cfg)) {
+	if (mpam_has_feature(mpam_feat_mbw_max, cfg)) {
 		delta = ((5 * MPAMCFG_MBW_MAX_MAX) / 100) - 1;
 		if (cfg->mbw_max > delta)
 			min = cfg->mbw_max - delta;
