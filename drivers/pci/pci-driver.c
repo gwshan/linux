@@ -21,6 +21,7 @@
 #include <linux/acpi.h>
 #include <linux/dma-map-ops.h>
 #include <linux/iommu.h>
+#include <linux/debug.h>
 #include "pci.h"
 #include "pcie/portdrv.h"
 
@@ -1634,7 +1635,11 @@ static int pci_dma_configure(struct device *dev)
 {
 	const struct device_driver *drv = READ_ONCE(dev->driver);
 	struct device *bridge;
+	bool debug = kern_dbg_is_target(dev);
 	int ret = 0;
+
+	KERN_DBG(debug, "==================== pci_dma_configure ==================== \n");
+	if (debug) dump_stack();
 
 	bridge = pci_get_host_bridge_device(to_pci_dev(dev));
 

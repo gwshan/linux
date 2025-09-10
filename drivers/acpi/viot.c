@@ -24,6 +24,7 @@
 #include <linux/pci.h>
 #include <linux/platform_device.h>
 #include <linux/property.h>
+#include <linux/debug.h>
 
 struct viot_iommu {
 	/* Node offset within the table */
@@ -323,6 +324,11 @@ static int viot_pci_dev_iommu_init(struct pci_dev *pdev, u16 dev_id, void *data)
 	struct viot_endpoint *ep;
 	struct device *aliased_dev = data;
 	u32 domain_nr = pci_domain_nr(pdev->bus);
+	bool debug = kern_dbg_is_target(aliased_dev);
+
+	KERN_DBG(debug, "%s: PCI device %04x:%02x:%02x.%01x, dev_id=0x%04x\n",
+		 __func__, pci_domain_nr(pdev->bus), pdev->bus->number,
+		 PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn), dev_id);
 
 	list_for_each_entry(ep, &viot_pci_ranges, list) {
 		if (domain_nr >= ep->segment_start &&
@@ -336,6 +342,9 @@ static int viot_pci_dev_iommu_init(struct pci_dev *pdev, u16 dev_id, void *data)
 						   epid);
 		}
 	}
+
+	KERN_DBG(debug, "%s: return -ENODEV\n", __func__);
+
 	return -ENODEV;
 }
 

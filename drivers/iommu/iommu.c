@@ -34,6 +34,7 @@
 #include <linux/sched/mm.h>
 #include <linux/msi.h>
 #include <uapi/linux/iommufd.h>
+#include <linux/debug.h>
 
 #include "dma-iommu.h"
 #include "iommu-priv.h"
@@ -560,6 +561,7 @@ static int __iommu_probe_device(struct device *dev, struct list_head *group_list
 {
 	struct iommu_group *group;
 	struct group_device *gdev;
+	bool debug = kern_dbg_is_target(dev);
 	int ret;
 
 	/*
@@ -572,8 +574,10 @@ static int __iommu_probe_device(struct device *dev, struct list_head *group_list
 	lockdep_assert_held(&iommu_probe_device_lock);
 
 	/* Device is probed already if in a group */
-	if (dev->iommu_group)
+	if (dev->iommu_group) {
+		KERN_DBG(debug, "%s: dev->iommu_group already exists\n", __func__);
 		return 0;
+	}
 
 	ret = iommu_init_device(dev);
 	if (ret)
@@ -1744,6 +1748,9 @@ static int iommu_bus_notifier(struct notifier_block *nb,
 			      unsigned long action, void *data)
 {
 	struct device *dev = data;
+	bool debug = kern_dbg_is_target(dev);
+
+	KERN_DBG(debug, "===================================================\n");
 
 	if (action == BUS_NOTIFY_ADD_DEVICE) {
 		int ret;

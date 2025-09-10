@@ -15,6 +15,7 @@
 #include <linux/of_device.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/debug.h>
 #include "debug.h"
 #include "direct.h"
 
@@ -612,6 +613,11 @@ void *dma_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
 {
 	const struct dma_map_ops *ops = get_dma_ops(dev);
 	void *cpu_addr;
+	bool debug = kern_dbg_is_target(dev);
+
+	KERN_DBG(debug, "%s: size=0x%lx, flag=0x%x, attrs=0x%lx\n",
+		 __func__, size, flag, attrs);
+
 
 	WARN_ON_ONCE(!dev->coherent_dma_mask);
 
@@ -626,6 +632,7 @@ void *dma_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
 	if (dma_alloc_from_dev_coherent(dev, size, dma_handle, &cpu_addr)) {
 		trace_dma_alloc(dev, cpu_addr, *dma_handle, size,
 				DMA_BIDIRECTIONAL, flag, attrs);
+		KERN_DBG(debug, "%s: alloc by dma_alloc_from_dev_coherent()\n", __func__);
 		return cpu_addr;
 	}
 
@@ -633,10 +640,13 @@ void *dma_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
 	flag &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
 
 	if (dma_alloc_direct(dev, ops)) {
+		KERN_DBG(debug, "%s: alloc by dma_direct_alloc()\n", __func__);
 		cpu_addr = dma_direct_alloc(dev, size, dma_handle, flag, attrs);
 	} else if (use_dma_iommu(dev)) {
+		KERN_DBG(debug, "%s: alloc by iommu_dma_alloc()\n", __func__);
 		cpu_addr = iommu_dma_alloc(dev, size, dma_handle, flag, attrs);
 	} else if (ops->alloc) {
+		KERN_DBG(debug, "%s: alloc by struct dma_map_ops::alloc()\n", __func__);
 		cpu_addr = ops->alloc(dev, size, dma_handle, flag, attrs);
 	} else {
 		trace_dma_alloc(dev, NULL, 0, size, DMA_BIDIRECTIONAL, flag,

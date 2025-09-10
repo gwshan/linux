@@ -19,6 +19,8 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/dma-map-ops.h>
+#include <linux/debug.h>
+
 #include "init.h"
 
 #define IORT_TYPE_MASK(type)	(1 << (type))
@@ -1261,9 +1263,17 @@ static int iort_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
 	struct iort_pci_alias_info *info = data;
 	struct acpi_iort_node *parent;
 	u32 streamid;
+	bool debug = kern_dbg_is_target(info->dev);
+
+	KERN_DBG(debug, "%s: PCI device %04x:%02x:%02x.%01x, alias=0x%04x\n",
+		 __func__, pci_domain_nr(pdev->bus), pdev->bus->number,
+		 PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn), alias);
 
 	parent = iort_node_map_id(info->node, alias, &streamid,
 				  IORT_IOMMU_TYPE);
+	KERN_DBG(debug, "%s: Found IORT_IOMMU_TYPE node 0x%lx\n",
+		 __func__, (unsigned long)parent);
+
 	return iort_iommu_xlate(info->dev, parent, streamid);
 }
 
@@ -1329,7 +1339,11 @@ static int iort_nc_iommu_map_id(struct device *dev,
 int iort_iommu_configure_id(struct device *dev, const u32 *id_in)
 {
 	struct acpi_iort_node *node;
+	bool debug = kern_dbg_is_target(dev);
 	int err = -ENODEV;
+
+	KERN_DBG(debug, "%s: dev=0x%lx, id_in=0x%lx\n",
+		 __func__, (unsigned long)dev, (unsigned long)id_in);
 
 	if (dev_is_pci(dev)) {
 		struct iommu_fwspec *fwspec;
@@ -1340,6 +1354,9 @@ int iort_iommu_configure_id(struct device *dev, const u32 *id_in)
 				      iort_match_node_callback, &bus->dev);
 		if (!node)
 			return -ENODEV;
+
+		KERN_DBG(debug, "%s: Found ACPI_IORT_NODE_PCI_ROOT_COMPLEX node 0x%lx\n",
+			 __func__, (unsigned long)node);
 
 		info.node = node;
 		err = pci_for_each_dma_alias(to_pci_dev(dev),

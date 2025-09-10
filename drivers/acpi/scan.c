@@ -21,6 +21,7 @@
 #include <linux/pgtable.h>
 #include <linux/crc32.h>
 #include <linux/dma-direct.h>
+#include <linux/debug.h>
 
 #include "internal.h"
 #include "sleep.h"
@@ -1617,6 +1618,7 @@ int acpi_iommu_fwspec_init(struct device *dev, u32 id,
 
 static int acpi_iommu_configure_id(struct device *dev, const u32 *id_in)
 {
+	bool debug = kern_dbg_is_target(dev);
 	int err;
 
 	/* Serialise to make dev->iommu stable under our potential fwspec */
@@ -1624,12 +1626,16 @@ static int acpi_iommu_configure_id(struct device *dev, const u32 *id_in)
 	/* If we already translated the fwspec there is nothing left to do */
 	if (dev_iommu_fwspec_get(dev)) {
 		mutex_unlock(&iommu_probe_device_lock);
+		KERN_DBG(debug, "%s: dev->iommu->fwsepc already exists\n", __func__);
 		return 0;
 	}
 
 	err = iort_iommu_configure_id(dev, id_in);
-	if (err && err != -EPROBE_DEFER)
+	if (err && err != -EPROBE_DEFER) {
+		KERN_DBG(debug, "%s: Error %d from iort_iommu_configure_id(), call viot_iommu_configure()\n",
+			 __func__, err);
 		err = viot_iommu_configure(dev);
+	}
 	mutex_unlock(&iommu_probe_device_lock);
 
 	return err;

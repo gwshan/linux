@@ -4740,6 +4740,9 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	struct arm_smmu_device *smmu;
 	struct device *dev = &pdev->dev;
 
+	pr_info("==================== %s [%s] ====================\n",
+		__func__, pdev->name ? pdev->name : "unknown");
+
 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
 	if (!smmu)
 		return -ENOMEM;
