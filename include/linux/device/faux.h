@@ -47,6 +47,7 @@ struct faux_device_ops {
 	void (*remove)(struct faux_device *faux_dev);
 };
 
+bool dev_is_faux_device(struct device *dev);
 struct faux_device *faux_device_create(const char *name,
 				       struct device *parent,
 				       const struct faux_device_ops *faux_ops);

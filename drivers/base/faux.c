@@ -89,6 +89,23 @@ static struct device_driver faux_driver = {
 	.suppress_bind_attrs = true,
 };
 
+/**
+ * dev_is_faux_device - Check if the specified device is a faux device
+ * @dev:	The specified device
+ *
+ * Return:
+ * True if the specified device is a faux device. Otherwise, False is
+ * returned.
+ */
+bool dev_is_faux_device(struct device *dev)
+{
+	if (dev->bus == &faux_bus_type)
+		return true;
+
+	return false;
+}
+EXPORT_SYMBOL_GPL(dev_is_faux_device);
+
 static void faux_device_release(struct device *dev)
 {
 	struct faux_object *faux_obj = to_faux_object(dev);

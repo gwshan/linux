@@ -8,6 +8,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/device/faux.h>
 #include <linux/init.h>
 #include <linux/irqdomain.h>
 #include <linux/pci.h>
@@ -1572,6 +1573,10 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
 	struct device *bus_dev;
 
 	if (acpi_disabled)
+		return 0;
+
+	/* A host bridge that is associated with a faux device has no ACPI sense */
+	if (bridge->dev.parent && dev_is_faux_device(bridge->dev.parent))
 		return 0;
 
 	cfg = bridge->bus->sysdata;
