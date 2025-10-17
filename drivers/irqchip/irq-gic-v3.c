@@ -2655,6 +2655,10 @@ gic_acpi_init(union acpi_subtable_headers *header, const unsigned long end)
 	size_t size;
 	int i, err;
 
+	GIC_DBG("\n");
+	GIC_DBG("=============================================================\n");
+	GIC_DBG("\n");
+
 	/* Get distributor base address */
 	dist = (struct acpi_madt_generic_distributor *)header;
 	acpi_data.dist_base = ioremap(dist->base_address,

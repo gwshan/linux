@@ -11,6 +11,11 @@
 #include <linux/msi.h>
 #include <linux/irqchip/arm-gic-common.h>
 
+#define GIC_DBG(fmt, arg...)			\
+	do {					\
+		printk(KERN_INFO fmt, ##arg);	\
+	} while (0)
+
 struct gic_quirk {
 	const char *desc;
 	const char *compatible;
