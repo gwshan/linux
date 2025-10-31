@@ -1525,7 +1525,7 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 {
 	int err;
 	u32 partid;
-	struct mpam_config cfg;
+	struct mpam_config *old, cfg;
 	struct mpam_props *cprops;
 	struct mpam_resctrl_res *res;
 	struct mpam_resctrl_dom *dom;
@@ -1553,8 +1553,18 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
        /*
 	* Copy the current config to avoid clearing other resources when the
 	* same component is exposed multiple times through resctrl.
+	*
+	* We're not resetting the configuration and the features should be
+	* cleared if they have been set the reset value. Otherwise, the features
+	* can include those unsupported ones.
 	*/
-	cfg = dom->ctrl_comp->cfg[partid];
+	old = &(dom->ctrl_comp->cfg[partid]);
+	old->reset_cpbm = false;
+	old->reset_mbw_pbm = false;
+	if (bitmap_full(old->features, MPAM_FEATURE_LAST))
+		bitmap_zero(old->features, MPAM_FEATURE_LAST);
+
+	cfg = *old;
 
 	switch (r->rid) {
 	case RDT_RESOURCE_L2:
