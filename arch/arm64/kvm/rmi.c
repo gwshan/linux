@@ -474,6 +474,78 @@ static void realm_unmap_shared_range(struct kvm *kvm,
 			     start, end);
 }
 
+static int realm_create_rd(struct kvm *kvm)
+{
+	struct realm *realm = &kvm->arch.realm;
+	struct realm_params *params __free(free_page) = NULL;
+	void *rd = NULL;
+	phys_addr_t rd_phys, params_phys, top_delegated;
+	size_t pgd_size = kvm_pgtable_stage2_pgd_size(kvm->arch.mmu.vtcr);
+	long rmi_ret;
+	int r;
+
+	if (WARN_ON(realm->rd))
+		return -EEXIST;
+
+	params = (void *)get_zeroed_page(GFP_KERNEL_ACCOUNT);
+	if (!params)
+		return -ENOMEM;
+
+	rd = (void *)__get_free_page(GFP_KERNEL_ACCOUNT);
+	if (!rd)
+		return -ENOMEM;
+
+	rd_phys = virt_to_phys(rd);
+	if (rmi_delegate_page(rd_phys)) {
+		r = -ENXIO;
+		goto free_rd;
+	}
+
+	if (rmi_delegate_range(kvm->arch.mmu.pgd_phys, pgd_size,
+			       &top_delegated)) {
+		r = -ENXIO;
+		goto out_undelegate_tables;
+	}
+
+	params->s2sz = VTCR_EL2_IPA(kvm->arch.mmu.vtcr);
+	params->rtt_level_start = get_start_level(realm);
+	params->rtt_num_start = pgd_size / PAGE_SIZE;
+	params->rtt_base = kvm->arch.mmu.pgd_phys;
+	params->hash_algo = RMI_HASH_SHA_256;
+
+	if (kvm->arch.arm_pmu) {
+		params->pmu_num_ctrs = kvm->arch.nr_pmu_counters;
+		params->flags0 |= RMI_REALM_PARAM_FLAG_PMU;
+	}
+
+	params_phys = virt_to_phys(params);
+
+	rmi_ret = rmi_realm_create(rd_phys, params_phys, realm->sro);
+	if (rmi_ret) {
+		r = rmi_ret < 0 ? rmi_ret : -ENXIO;
+		goto out_undelegate_tables;
+	}
+
+	realm->rd = rd;
+	kvm_set_realm_state(kvm, REALM_STATE_NEW);
+
+	return 0;
+
+out_undelegate_tables:
+	if (WARN_ON(rmi_undelegate_range(kvm->arch.mmu.pgd_phys,
+					 top_delegated - kvm->arch.mmu.pgd_phys))) {
+		/* Leak the pages if they cannot be returned */
+		kvm->arch.mmu.pgt = NULL;
+	}
+	if (WARN_ON(rmi_undelegate_page(rd_phys))) {
+		/* Leak the page if it isn't returned */
+		return r;
+	}
+free_rd:
+	free_page((unsigned long)rd);
+	return r;
+}
+
 static void realm_unmap_private_range(struct kvm *kvm,
 				      unsigned long start,
 				      unsigned long end,
@@ -1090,6 +1162,105 @@ int noinstr kvm_rec_enter(struct kvm_vcpu *vcpu)
 	return ret;
 }
 
+static int realm_ensure_created(struct kvm *kvm)
+{
+	lockdep_assert_held(&kvm->arch.config_lock);
+
+	switch (kvm_realm_state(kvm)) {
+	case REALM_STATE_NONE:
+		break;
+	case REALM_STATE_NEW:
+		return 0;
+	case REALM_STATE_DEAD:
+		return -ENXIO;
+	default:
+		return -EBUSY;
+	}
+
+	return realm_create_rd(kvm);
+}
+
+static int kvm_create_rec(struct kvm_vcpu *vcpu)
+{
+	struct user_pt_regs *vcpu_regs = &vcpu->arch.ctxt.regs;
+	unsigned long mpidr = kvm_vcpu_get_mpidr_aff(vcpu);
+	struct realm *realm = &vcpu->kvm->arch.realm;
+	struct realm_rec *rec = &vcpu->arch.rec;
+	struct rec_params *params;
+	long rmi_ret;
+	int r, i;
+
+	if (rec->run)
+		return -EBUSY;
+
+	/*
+	 * The RMM will report PSCI v1.0 to Realms and the KVM_ARM_VCPU_PSCI_0_2
+	 * flag covers v0.2 and onwards.
+	 */
+	if (!vcpu_has_feature(vcpu, KVM_ARM_VCPU_PSCI_0_2))
+		return -EINVAL;
+
+	BUILD_BUG_ON(sizeof(*params) > PAGE_SIZE);
+	BUILD_BUG_ON(sizeof(*rec->run) > PAGE_SIZE);
+
+	params = (struct rec_params *)get_zeroed_page(GFP_KERNEL);
+	rec->rec_page = (void *)__get_free_page(GFP_KERNEL);
+	rec->run = (struct rec_run *)get_zeroed_page(GFP_KERNEL);
+	rec->sro = kmalloc_obj(*rec->sro);
+	if (!params || !rec->rec_page || !rec->run || !rec->sro) {
+		r = -ENOMEM;
+		goto out_free_pages;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(params->gprs); i++)
+		params->gprs[i] = vcpu_regs->regs[i];
+
+	params->pc = vcpu_regs->pc;
+
+	if (vcpu->vcpu_id == 0)
+		params->flags |= REC_PARAMS_FLAG_RUNNABLE;
+
+	rec->rec_phys = virt_to_phys(rec->rec_page);
+	rec->run_phys = virt_to_phys(rec->run);
+
+	if (rmi_delegate_page(rec->rec_phys)) {
+		r = -ENXIO;
+		goto out_free_pages;
+	}
+
+	params->mpidr = mpidr;
+
+	rmi_ret = rmi_rec_create(virt_to_phys(realm->rd), rec->rec_phys,
+				 virt_to_phys(params), rec->sro);
+	if (rmi_ret) {
+		r = rmi_ret < 0 ? rmi_ret : -ENXIO;
+		goto out_undelegate_rmm_rec;
+	}
+
+	rec->mpidr = mpidr;
+	/* Secondary RECs start powered off in the RMM. */
+	if (!(params->flags & REC_PARAMS_FLAG_RUNNABLE))
+		kvm_arm_vcpu_power_off(vcpu);
+
+	free_page((unsigned long)params);
+	return 0;
+
+out_undelegate_rmm_rec:
+	if (WARN_ON(rmi_undelegate_page(rec->rec_phys)))
+		rec->rec_page = NULL;
+out_free_pages:
+	free_page((unsigned long)rec->run);
+	free_page((unsigned long)rec->rec_page);
+	free_page((unsigned long)params);
+	kfree(rec->sro);
+	rec->run = NULL;
+	rec->rec_page = NULL;
+	rec->rec_phys = 0;
+	rec->run_phys = 0;
+	rec->sro = NULL;
+	return r;
+}
+
 void kvm_destroy_rec(struct kvm_vcpu *vcpu)
 {
 	struct realm_rec *rec = &vcpu->arch.rec;
@@ -1113,6 +1284,56 @@ void kvm_destroy_rec(struct kvm_vcpu *vcpu)
 	rec->rec_page = NULL;
 	rec->rec_phys = 0;
 	rec->run_phys = 0;
+}
+
+int kvm_activate_realm(struct kvm *kvm)
+{
+	struct realm *realm = &kvm->arch.realm;
+	struct kvm_vcpu *vcpu;
+	unsigned long i;
+	int ret;
+
+	if (kvm_realm_state(kvm) >= REALM_STATE_ACTIVE)
+		return 0;
+
+	guard(mutex)(&kvm->arch.config_lock);
+	/* Check again with the lock held */
+	if (kvm_realm_state(kvm) >= REALM_STATE_ACTIVE)
+		return 0;
+
+	if (!irqchip_in_kernel(kvm)) {
+		/* Userspace irqchip not yet supported with realms */
+		return -EOPNOTSUPP;
+	}
+
+	if (!vgic_initialized(kvm))
+		return -ENODEV;
+
+	ret = realm_ensure_created(kvm);
+	if (ret)
+		return ret;
+
+	/* Mark state as dead in case we fail */
+	kvm_set_realm_state(kvm, REALM_STATE_DEAD);
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		ret = kvm_create_rec(vcpu);
+		if (ret)
+			goto out_vm_dead;
+	}
+
+	ret = rmi_realm_activate(virt_to_phys(realm->rd));
+	if (ret) {
+		ret = -ENXIO;
+		goto out_vm_dead;
+	}
+
+	kvm_set_realm_state(kvm, REALM_STATE_ACTIVE);
+	return 0;
+
+out_vm_dead:
+	kvm_vm_dead(kvm);
+	return ret;
 }
 
 void kvm_destroy_realm(struct kvm *kvm)
