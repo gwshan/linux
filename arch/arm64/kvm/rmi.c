@@ -148,7 +148,7 @@ static long realm_rtt_create(struct realm *realm,
 			     phys_addr_t phys)
 {
 	addr = ALIGN_DOWN(addr, kvm_granule_size(level - 1));
-	return rmi_rtt_create(virt_to_phys(realm->rd), phys, addr, level);
+	return rmi_rtt_create(realm->rd_phys, phys, addr, level);
 }
 
 static long realm_rtt_fold(struct realm *realm,
@@ -160,7 +160,7 @@ static long realm_rtt_fold(struct realm *realm,
 	long ret;
 
 	addr = ALIGN_DOWN(addr, kvm_granule_size(level - 1));
-	ret = rmi_rtt_fold(virt_to_phys(realm->rd), addr, level, &out_rtt);
+	ret = rmi_rtt_fold(realm->rd_phys, addr, level, &out_rtt);
 
 	if (ret == RMI_SUCCESS && rtt_granule)
 		*rtt_granule = out_rtt;
@@ -183,7 +183,7 @@ static long realm_rtt_destroy(struct realm *realm, unsigned long addr,
 	unsigned long out_rtt;
 	long ret;
 
-	ret = rmi_rtt_destroy(virt_to_phys(realm->rd), addr, level,
+	ret = rmi_rtt_destroy(realm->rd_phys, addr, level,
 			      &out_rtt, next_addr);
 
 	if (ret == RMI_SUCCESS)
@@ -454,7 +454,7 @@ static void realm_unmap_shared_range(struct kvm *kvm,
 				     bool may_block)
 {
 	struct realm *realm = &kvm->arch.realm;
-	unsigned long rd = virt_to_phys(realm->rd);
+	unsigned long rd = realm->rd_phys;
 	unsigned long next_addr, addr;
 	unsigned long shared_bit = BIT(realm->ia_bits - 1);
 
@@ -561,7 +561,7 @@ static int realm_create_rd(struct kvm *kvm)
 	long rmi_ret;
 	int r;
 
-	if (WARN_ON(realm->rd))
+	if (WARN_ON(realm->rd_phys))
 		return -EEXIST;
 
 	params = (void *)get_zeroed_page(GFP_KERNEL_ACCOUNT);
@@ -609,7 +609,7 @@ static int realm_create_rd(struct kvm *kvm)
 		goto out_undelegate_tables;
 	}
 
-	realm->rd = rd;
+	realm->rd_phys = rd_phys;
 	kvm_set_realm_state(kvm, REALM_STATE_NEW);
 
 	return 0;
@@ -635,7 +635,7 @@ static void realm_unmap_private_range(struct kvm *kvm,
 				      bool may_block)
 {
 	struct realm *realm = &kvm->arch.realm;
-	unsigned long rd = virt_to_phys(realm->rd);
+	unsigned long rd = realm->rd_phys;
 	unsigned long next_addr, addr;
 	long ret;
 
@@ -713,7 +713,7 @@ static int realm_data_map_init(struct kvm *kvm, unsigned long ipa,
 			       unsigned long flags)
 {
 	struct realm *realm = &kvm->arch.realm;
-	phys_addr_t rd = virt_to_phys(realm->rd);
+	phys_addr_t rd = realm->rd_phys;
 	phys_addr_t dst_phys, src_phys;
 	long ret;
 
@@ -804,7 +804,7 @@ static int realm_map_protected(struct kvm *kvm,
 	struct realm *realm = &kvm->arch.realm;
 	phys_addr_t phys = __pfn_to_phys(pfn);
 	phys_addr_t base_phys = phys;
-	phys_addr_t rd = virt_to_phys(realm->rd);
+	phys_addr_t rd = realm->rd_phys;
 	phys_addr_t delegated_phys;
 	unsigned long base_ipa = ipa;
 	unsigned long ipa_top;
@@ -890,7 +890,7 @@ static int realm_map_unprotected(struct kvm *kvm,
 {
 	struct realm *realm = &kvm->arch.realm;
 	unsigned long attr, flags = 0;
-	phys_addr_t rd = virt_to_phys(realm->rd);
+	phys_addr_t rd = realm->rd_phys;
 	phys_addr_t phys = __pfn_to_phys(pfn);
 	unsigned long ipa_top = ipa + size;
 	unsigned int retries = 0;
@@ -1008,7 +1008,7 @@ static int ripas_change(struct kvm *kvm,
 			unsigned long *top_ipa)
 {
 	struct realm *realm = &kvm->arch.realm;
-	phys_addr_t rd_phys = virt_to_phys(realm->rd);
+	phys_addr_t rd_phys = realm->rd_phys;
 	phys_addr_t rec_phys;
 	struct kvm_mmu_memory_cache *memcache = NULL;
 	long ret = 0;
@@ -1557,7 +1557,7 @@ static int kvm_create_rec(struct kvm_vcpu *vcpu)
 
 	params->mpidr = mpidr;
 
-	rmi_ret = rmi_rec_create(virt_to_phys(realm->rd), rec->rec_phys,
+	rmi_ret = rmi_rec_create(realm->rd_phys, rec->rec_phys,
 				 virt_to_phys(params), rec->sro);
 	if (rmi_ret) {
 		r = rmi_ret < 0 ? rmi_ret : -ENXIO;
@@ -1654,7 +1654,7 @@ int kvm_activate_realm(struct kvm *kvm)
 	if (ret)
 		goto out_vm_dead;
 
-	ret = rmi_realm_activate(virt_to_phys(realm->rd));
+	ret = rmi_realm_activate(realm->rd_phys);
 	if (ret) {
 		ret = -ENXIO;
 		goto out_vm_dead;
@@ -1692,8 +1692,8 @@ void kvm_destroy_realm(struct kvm *kvm)
 	 */
 	realm_unmap_stage2(kvm);
 
-	if (realm->rd) {
-		phys_addr_t rd_phys = virt_to_phys(realm->rd);
+	if (realm->rd_phys) {
+		phys_addr_t rd_phys = realm->rd_phys;
 
 		if (WARN_ON(rmi_realm_terminate(rd_phys, realm->sro)))
 			return;
@@ -1704,7 +1704,7 @@ void kvm_destroy_realm(struct kvm *kvm)
 		if (WARN_ON(rmi_realm_destroy(rd_phys, realm->sro)))
 			return;
 		rmi_free_delegated_page(rd_phys);
-		realm->rd = NULL;
+		realm->rd_phys = 0;
 	}
 
 	if (WARN_ON(rmi_undelegate_range(kvm->arch.mmu.pgd_phys,
@@ -1761,5 +1761,6 @@ void kvm_init_rmi(void)
 	if (rmm_check_features())
 		return;
 
-	/* Future patch will enable static branch kvm_rmi_is_available */
+	kvm_info("Realm guests supported\n");
+	static_branch_enable(&kvm_rmi_is_available);
 }

@@ -54,14 +54,14 @@ enum realm_state {
 /**
  * struct realm - Additional per VM data for a Realm
  *
- * @rd: Kernel mapping of the RMM-managed Realm Descriptor (RD) granule
+ * @rd_phys: Physical address of the RMM-managed Realm Descriptor (RD) granule
  * @sro: Preallocated SRO state context for Realm MMU operations
  * @state: The lifetime state machine for the realm
  * @ia_bits: Number of valid Input Address bits in the IPA
  * @stage2_unmapped: The Realm stage-2 mappings have been removed
  */
 struct realm {
-	void *rd;
+	phys_addr_t rd_phys;
 	/*
 	 * Reused by RTT map/unmap SRO commands. Those commands are only
 	 * issued from Realm stage-2 map/unmap paths while kvm->mmu_lock is
