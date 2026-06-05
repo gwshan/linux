@@ -692,12 +692,16 @@ static unsigned long addr_range_desc(unsigned long phys, unsigned long size)
 	unsigned long out = 0;
 
 	switch (size) {
+#ifndef __PAGETABLE_PUD_FOLDED
 	case P4D_SIZE:
 		out = 3 | (1 << 2);
 		break;
+#endif
+#ifndef __PAGETABLE_PMD_FOLDED
 	case PUD_SIZE:
 		out = 2 | (1 << 2);
 		break;
+#endif
 	case PMD_SIZE:
 		out = 1 | (1 << 2);
 		break;

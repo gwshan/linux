@@ -1724,8 +1724,10 @@ static int gmem_abort(const struct kvm_s2_fault_desc *s2fd)
 	}
 
 	if (kvm_is_realm(kvm)) {
-		ret = realm_map_ipa(kvm, s2fd->fault_ipa, pfn,
-				    PAGE_SIZE, KVM_PGTABLE_PROT_R | KVM_PGTABLE_PROT_W, memcache);
+		ret = realm_map_ipa(kvm, ALIGN_DOWN(s2fd->fault_ipa, PAGE_SIZE),
+				    pfn, PAGE_SIZE,
+				    KVM_PGTABLE_PROT_R | KVM_PGTABLE_PROT_W,
+				    memcache);
 		goto out_release_page;
 	}
 
@@ -1757,6 +1759,39 @@ struct kvm_s2_fault_vma_info {
 	bool		map_writable;
 	bool		map_non_cacheable;
 };
+
+static void dump_s2fd(const struct kvm_s2_fault_desc *s2fd)
+{
+	pr_info("==================== s2fd ====================\n");
+	pr_info("vcpu:       0x%lx, id=%d, idx=%d\n",
+		(unsigned long)(s2fd->vcpu), s2fd->vcpu->vcpu_id, s2fd->vcpu->vcpu_idx);
+	pr_info("esr_el2:    0x%llx\n", kvm_vcpu_get_esr(s2fd->vcpu));
+	pr_info("fault_ipa:  0x%lx\n", (unsigned long)(s2fd->fault_ipa));
+	pr_info("memslot:    0x%lx  0x%lx [%d] [0x%x] [0x%lx  0x%lx]\n",
+                (unsigned long)(s2fd->memslot->base_gfn), s2fd->memslot->npages,
+		s2fd->memslot->id, s2fd->memslot->flags,
+		(unsigned long)(s2fd->memslot->gmem.file),
+		(unsigned long)(s2fd->memslot->gmem.pgoff));
+	pr_info("hva:        0x%lx\n", s2fd->hva);
+}
+
+static void dump_s2vi(const struct kvm_s2_fault_vma_info *s2vi)
+{
+	pr_info("==================== s2vi ====================\n");
+	pr_info("mmu_seq:            0x%lx\n", s2vi->mmu_seq);
+	pr_info("vma_pagesize:       0x%lx\n", s2vi->vma_pagesize);
+	pr_info("vm_flags:           0x%lx\n", s2vi->vm_flags);
+	pr_info("max_page_size:      0x%lx\n", s2vi->max_map_size);
+	pr_info("page:               0x%lx\n", (unsigned long)(s2vi->page));
+	pr_info("pfn:                0x%lx\n", (unsigned long)(s2vi->pfn));
+	pr_info("gfn:                0x%lx\n", (unsigned long)(s2vi->gfn));
+	pr_info("device:             %s\n",    s2vi->device ? "yes" : "no");
+	pr_info("mte_allowed:        %s\n",    s2vi->mte_allowed ? "yes" : "no");
+	pr_info("is_vma_cacheable:   %s\n",    s2vi->is_vma_cacheable ? "yes" : "no");
+	pr_info("map_writable:       %s\n",    s2vi->map_writable ? "yes" : "no");
+	pr_info("map_non_cacheable:  %s\n",    s2vi->map_non_cacheable ? "yes" : "no");
+}
+
 
 static int pkvm_mem_abort(const struct kvm_s2_fault_desc *s2fd)
 {
@@ -2129,8 +2164,13 @@ static int kvm_s2_fault_map(const struct kvm_s2_fault_desc *s2fd,
 		ret = KVM_PGT_FN(kvm_pgtable_stage2_relax_perms)(pgt, gfn_to_gpa(gfn),
 								 prot, flags);
 	} else if (kvm_is_realm(kvm)) {
-		ret = realm_map_ipa(kvm, s2fd->fault_ipa, pfn, mapping_size,
-				    prot, memcache);
+		ret = realm_map_ipa(kvm, ALIGN_DOWN(s2fd->fault_ipa, mapping_size),
+				    pfn, mapping_size, prot, memcache);
+		if (ret != 0) {
+			pr_info("%s: Error %d from realm_map_ipa()\n", __func__, ret);
+			dump_s2fd(s2fd);
+			dump_s2vi(s2vi);
+		}
 	} else {
 		ret = KVM_PGT_FN(kvm_pgtable_stage2_map)(pgt, gfn_to_gpa(gfn), mapping_size,
 							 __pfn_to_phys(pfn), prot,
