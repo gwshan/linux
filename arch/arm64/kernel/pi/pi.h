@@ -19,6 +19,7 @@ static inline void *prel64_to_pointer(const prel64_t *offset)
 	return (void *)offset + *offset;
 }
 
+extern u64 idmap_params[];
 extern bool dynamic_scs_is_enabled;
 
 extern pgd_t init_idmap_pg_dir[], init_idmap_pg_end[];

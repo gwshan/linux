@@ -88,6 +88,9 @@ void __init map_range(phys_addr_t *pte, u64 start, u64 end, phys_addr_t pa,
 	}
 }
 
+u64 idmap_pg_dir_pos;
+u64 idmap_params[8];
+
 asmlinkage phys_addr_t __init create_init_idmap(pgd_t *pg_dir, ptval_t clrmask)
 {
 	phys_addr_t ptep = (phys_addr_t)pg_dir + PAGE_SIZE; /* MMU is off */
@@ -96,6 +99,16 @@ asmlinkage phys_addr_t __init create_init_idmap(pgd_t *pg_dir, ptval_t clrmask)
 
 	pgprot_val(text_prot) &= ~clrmask;
 	pgprot_val(data_prot) &= ~clrmask;
+
+	idmap_pg_dir_pos = (u64)pg_dir;
+	idmap_params[0] = (u64)pg_dir;
+	idmap_params[1] = clrmask;
+	idmap_params[2] = (u64)_stext;
+	idmap_params[3] = (u64)__initdata_begin;
+	idmap_params[4] = (phys_addr_t)_stext;
+	idmap_params[5] = (u64)__initdata_begin;
+	idmap_params[6] = (u64)_end;
+	idmap_params[7] = (phys_addr_t)__initdata_begin; 
 
 	/* MMU is off; pointer casts to phys_addr_t are safe */
 	map_range(&ptep, (u64)_stext, (u64)__initdata_begin,

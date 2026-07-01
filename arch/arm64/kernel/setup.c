@@ -278,8 +278,27 @@ u64 cpu_logical_map(unsigned int cpu)
 	return __cpu_logical_map[cpu];
 }
 
+extern u64 __pi_idmap_pg_dir_pos;
+extern u64 __pi_idmap_params[];
+
+static void dump_params(void)
+{
+	pr_info("===== Dump params\n");
+	pr_info("                              0x%llx\n", __pi_idmap_pg_dir_pos);
+	pr_info("   idmap_pg_dir               0x%llx\n", __pi_idmap_params[0]);
+	pr_info("   idmap_clrmask              0x%llx\n", __pi_idmap_params[1]);
+	pr_info("   idmap_virt_stext           0x%llx\n", __pi_idmap_params[2]);
+	pr_info("   idmap_virt_initdata_begin  0x%llx\n", __pi_idmap_params[3]);
+	pr_info("   idmap_phys_stext           0x%llx\n", __pi_idmap_params[4]);
+	pr_info("   idmap_virt_initdata_begin  0x%llx\n", __pi_idmap_params[5]);
+	pr_info("   idmap_virt_end             0x%llx\n", __pi_idmap_params[6]);
+	pr_info("   idmap_phys_initdata_begin  0x%llx\n", __pi_idmap_params[7]);
+}
+
 void __init __no_sanitize_address setup_arch(char **cmdline_p)
 {
+	dump_params();
+
 	setup_initial_init_mm(_text, _etext, _edata, _end);
 
 	*cmdline_p = boot_command_line;
