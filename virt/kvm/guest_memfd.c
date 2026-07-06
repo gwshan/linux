@@ -250,16 +250,23 @@ static void __kvm_gmem_invalidate_start(struct gmem_file *f, pgoff_t start,
 		KVM_MMU_UNLOCK(kvm);
 }
 
+static void kvm_gmem_invalidate_start_filter(struct inode *inode,
+					     pgoff_t start, pgoff_t end,
+					     enum kvm_gfn_range_filter attr_filter)
+{
+	struct gmem_file *f;
+
+	kvm_gmem_for_each_file(f, inode)
+		__kvm_gmem_invalidate_start(f, start, end, attr_filter);
+}
+
 static void kvm_gmem_invalidate_start(struct inode *inode, pgoff_t start,
 				      pgoff_t end)
 {
 	enum kvm_gfn_range_filter attr_filter;
-	struct gmem_file *f;
-
 	attr_filter = kvm_gmem_get_invalidate_filter(inode, start, end);
 
-	kvm_gmem_for_each_file(f, inode)
-		__kvm_gmem_invalidate_start(f, start, end, attr_filter);
+	kvm_gmem_invalidate_start_filter(inode, start, end, attr_filter);
 }
 
 static void __kvm_gmem_invalidate_end(struct gmem_file *f, pgoff_t start,
@@ -724,9 +731,14 @@ static int __kvm_gmem_set_attributes(struct inode *inode, pgoff_t start,
 	/*
 	 * From this point on guest_memfd has performed necessary
 	 * checks and can proceed to do guest-breaking changes.
+	 * Also, we don't have to invalidate the regions that
+	 * may already be in the requested state. Hence, we could
+	 * explicitly filter the invalidations to the opposite
+	 * state.
 	 */
 
-	kvm_gmem_invalidate_start(inode, start, end);
+	kvm_gmem_invalidate_start_filter(inode, start, end,
+					to_private ? KVM_FILTER_SHARED : KVM_FILTER_PRIVATE);
 
 	if (!to_private)
 		kvm_gmem_invalidate(inode, start, end);
