@@ -6382,6 +6382,11 @@ KVM_SET_USER_MEMORY_REGION2, e.g. shared memory can be lazily mapped/allocated
 on-demand.
 
 When mapping a gfn into the guest, KVM selects shared vs. private, i.e consumes
+userspace_addr vs. guest_memfd, based on the state in guest_memfd, which is the
+sole authority on private vs. shared memory.  See :ref:`KVM_CREATE_GUEST_MEMFD`
+to find out more about the creation-time shared/private status.
+
+If in-place conversion is disabled, KVM selects shared vs. private, i.e consumes
 userspace_addr vs. guest_memfd, based on the gfn's KVM_MEMORY_ATTRIBUTE_PRIVATE
 state.  At VM creation time, all memory is shared, i.e. the PRIVATE attribute
 is '0' for all gfns.  Userspace can control whether memory is shared/private by
@@ -6428,6 +6433,8 @@ Note, there is no "get" API.  Userspace is responsible for explicitly tracking
 the state of a gfn/page as needed.
 
 The "flags" field is reserved for future extensions and must be '0'.
+
+.. _KVM_CREATE_GUEST_MEMFD:
 
 4.142 KVM_CREATE_GUEST_MEMFD
 ----------------------------
