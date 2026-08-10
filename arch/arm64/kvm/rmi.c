@@ -1344,6 +1344,20 @@ static void noinstr load_realm_timer_state(struct kvm_vcpu *vcpu)
 	write_sysreg_el0(rec_exit->cntp_ctl, SYS_CNTP_CTL);
 }
 
+void kvm_rec_set_wfx_traps(struct kvm_vcpu *vcpu)
+{
+	struct realm_rec *rec = &vcpu->arch.rec;
+
+	rec->run->enter.flags &=
+		~(REC_ENTER_FLAG_TRAP_WFE | REC_ENTER_FLAG_TRAP_WFI);
+
+	if (vcpu->arch.hcr_el2 & HCR_TWE)
+		rec->run->enter.flags |= REC_ENTER_FLAG_TRAP_WFE;
+
+	if (vcpu->arch.hcr_el2 & HCR_TWI)
+		rec->run->enter.flags |= REC_ENTER_FLAG_TRAP_WFI;
+}
+
 static void noinstr rec_enter_sync(struct kvm_vcpu *vcpu)
 {
 	struct rec_run *run = vcpu->arch.rec.run;

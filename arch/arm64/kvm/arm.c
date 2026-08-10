@@ -778,6 +778,9 @@ nommu:
 	else
 		vcpu->arch.hcr_el2 |= HCR_TWI;
 
+	if (vcpu_is_rec(vcpu))
+		kvm_rec_set_wfx_traps(vcpu);
+
 	vcpu_set_pauth_traps(vcpu);
 
 	if (is_protected_kvm_enabled()) {
