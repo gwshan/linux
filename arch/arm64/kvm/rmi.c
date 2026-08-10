@@ -1362,6 +1362,13 @@ static void noinstr rec_enter_sync(struct kvm_vcpu *vcpu)
 		}
 		vcpu_clear_flag(vcpu, INCREMENT_PC);
 	}
+
+	/* sync WFx traps */
+	entry->flags &= ~(REC_ENTER_FLAG_TRAP_WFE | REC_ENTER_FLAG_TRAP_WFI);
+	if (vcpu->arch.hcr_el2 & HCR_TWE)
+		entry->flags |= REC_ENTER_FLAG_TRAP_WFE;
+	if (vcpu->arch.hcr_el2 & HCR_TWI)
+		entry->flags |= REC_ENTER_FLAG_TRAP_WFI;
 }
 
 static void noinstr rec_prepare_exit_state(struct kvm_vcpu *vcpu)
