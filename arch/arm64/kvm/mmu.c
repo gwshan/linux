@@ -376,18 +376,27 @@ static void __unmap_stage2_range(struct kvm_s2_mmu *mmu, phys_addr_t start, u64 
 
 static void kvm_vm_stage2_unmap_range(struct kvm_s2_mmu *mmu,
 				      phys_addr_t start,
-				      u64 size, bool may_block)
+				      u64 size, bool may_block,
+				      enum kvm_gfn_range_filter filter)
 {
 	__unmap_stage2_range(mmu, start, size, may_block);
+}
+
+static void kvm_stage2_unmap_range_filter(struct kvm_s2_mmu *mmu, phys_addr_t start,
+					  u64 size, bool may_block,
+					  enum kvm_gfn_range_filter filter)
+{
+	struct kvm *kvm = kvm_s2_mmu_to_kvm(mmu);
+
+	if (kvm->arch.vm_s2_ops->vm_stage2_unmap_range)
+		kvm->arch.vm_s2_ops->vm_stage2_unmap_range(mmu, start, size, may_block, filter);
 }
 
 void kvm_stage2_unmap_range(struct kvm_s2_mmu *mmu, phys_addr_t start,
 			    u64 size, bool may_block)
 {
-	struct kvm *kvm = kvm_s2_mmu_to_kvm(mmu);
-
-	if (kvm->arch.vm_s2_ops->vm_stage2_unmap_range)
-		kvm->arch.vm_s2_ops->vm_stage2_unmap_range(mmu, start, size, may_block);
+	kvm_stage2_unmap_range_filter(mmu, start, size, may_block,
+					KVM_FILTER_PRIVATE | KVM_FILTER_SHARED);
 }
 
 void kvm_stage2_flush_range(struct kvm_s2_mmu *mmu, phys_addr_t addr, phys_addr_t end)
@@ -2521,9 +2530,10 @@ bool kvm_unmap_gfn_range(struct kvm *kvm, struct kvm_gfn_range *range)
 	if (!kvm->arch.mmu.pgt)
 		return false;
 
-	kvm_stage2_unmap_range(&kvm->arch.mmu, range->start << PAGE_SHIFT,
-				(range->end - range->start) << PAGE_SHIFT,
-				range->may_block);
+	kvm_stage2_unmap_range_filter(&kvm->arch.mmu, range->start << PAGE_SHIFT,
+					(range->end - range->start) << PAGE_SHIFT,
+					range->may_block,
+					range->attr_filter);
 
 	kvm_nested_s2_unmap(kvm, range->may_block);
 	return false;
