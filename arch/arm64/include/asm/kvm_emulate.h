@@ -834,4 +834,19 @@ static inline bool vcpu_is_rec(const struct kvm_vcpu *vcpu)
 	return kvm_is_realm(vcpu->kvm);
 }
 
+static inline bool kvm_vm_has_external_state(struct kvm *kvm)
+{
+	return kvm_vm_is_protected(kvm) || kvm_is_realm(kvm);
+}
+
+static inline bool vcpu_has_external_state(const struct kvm_vcpu *vcpu)
+{
+	return kvm_vm_has_external_state(vcpu->kvm);
+}
+
+static inline bool vcpu_has_external_mmu(const struct kvm_vcpu *vcpu)
+{
+	return is_protected_kvm_enabled() || vcpu_is_rec(vcpu);
+}
+
 #endif /* __ARM64_KVM_EMULATE_H__ */

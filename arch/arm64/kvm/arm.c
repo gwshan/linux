@@ -723,7 +723,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	struct kvm_s2_mmu *mmu;
 	int *last_ran;
 
-	if (is_protected_kvm_enabled() || kvm_is_realm(vcpu->kvm))
+	if (vcpu_has_external_mmu(vcpu))
 		goto nommu;
 
 	if (vcpu_has_nv(vcpu))

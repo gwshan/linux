@@ -1091,7 +1091,7 @@ static void timer_context_init(struct kvm_vcpu *vcpu, int timerid)
 	ctxt->timer_id = timerid;
 
 	/* The RMM architecture fixes both Realm counter offsets at zero. */
-	if (!kvm_vm_is_protected(vcpu->kvm) && !vcpu_is_rec(vcpu)) {
+	if (!vcpu_has_external_state(vcpu)) {
 		if (timerid == TIMER_VTIMER)
 			ctxt->offset.vm_offset = &kvm->arch.timer_data.voffset;
 		else
@@ -1125,7 +1125,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
 	 * Synchronize offsets across timers of a VM if not already provided.
 	 * Realm counter offsets are fixed at zero by the RMM architecture.
 	 */
-	if (!vcpu_is_protected(vcpu) && !vcpu_is_rec(vcpu) &&
+	if (!vcpu_has_external_state(vcpu) &&
 	    !test_bit(KVM_ARCH_FLAG_VM_COUNTER_OFFSET, &vcpu->kvm->arch.flags)) {
 		timer_set_offset(vcpu_vtimer(vcpu), kvm_phys_timer_read());
 		timer_set_offset(vcpu_ptimer(vcpu), 0);
@@ -1758,7 +1758,7 @@ int kvm_vm_ioctl_set_counter_offset(struct kvm *kvm,
 	if (offset->reserved)
 		return -EINVAL;
 
-	if (kvm_vm_is_protected(kvm) || kvm_is_realm(kvm))
+	if (kvm_vm_has_external_state(kvm))
 		return -EINVAL;
 
 	mutex_lock(&kvm->lock);
