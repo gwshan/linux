@@ -1293,23 +1293,28 @@ static int kvm_rec_complete_psci(struct kvm_vcpu *vcpu)
 	return r ?: 1;
 }
 
+static void noinstr kvm_rec_complete_sysreg_access(struct kvm_vcpu *vcpu)
+{
+	struct realm_rec *rec = &vcpu->arch.rec;
+	u64 esr = kvm_vcpu_get_esr(vcpu);
+	int rt;
+
+	if (ESR_ELx_EC(esr) != ESR_ELx_EC_SYS64 ||
+	    (esr & ESR_ELx_SYS64_ISS_DIR_MASK) != ESR_ELx_SYS64_ISS_DIR_READ)
+		return;
+
+	rt = kvm_vcpu_sys_get_rt(vcpu);
+	if (rt < REC_RUN_GPRS)
+		rec->run->enter.gprs[rt] = vcpu_get_reg(vcpu, rt);
+}
+
 int kvm_rec_handle_request(struct kvm_vcpu *vcpu)
 {
 	struct realm_rec *rec = &vcpu->arch.rec;
-	u64 esr;
 
 	switch (rec->run->exit.exit_reason) {
 	case RMI_EXIT_SYNC:
-		esr = rec->run->exit.esr;
-		if (ESR_ELx_EC(esr) == ESR_ELx_EC_SYS64 &&
-		    (esr & ESR_ELx_SYS64_ISS_DIR_MASK) ==
-				ESR_ELx_SYS64_ISS_DIR_READ) {
-			int rt = ESR_ELx_SYS64_ISS_RT(esr);
-
-			if (rt < REC_RUN_GPRS)
-				rec->run->enter.gprs[rt] =
-					vcpu_get_reg(vcpu, rt);
-		}
+		kvm_rec_complete_sysreg_access(vcpu);
 		break;
 	case RMI_EXIT_PSCI:
 		return kvm_rec_complete_psci(vcpu);
@@ -1397,6 +1402,64 @@ static void noinstr rec_prepare_exit_state(struct kvm_vcpu *vcpu)
 		vcpu_set_reg(vcpu, rt, rec->run->exit.gprs[rt]);
 }
 
+static int noinstr rec_perform_vgic_cpuif_access(struct kvm_vcpu *vcpu)
+{
+	unsigned long elr, spsr, pc, pstate;
+	int handled;
+
+	elr = read_sysreg_el2(SYS_ELR);
+	spsr = read_sysreg_el2(SYS_SPSR);
+	pc = *vcpu_pc(vcpu);
+	pstate = *vcpu_cpsr(vcpu);
+
+	/*
+	 * RMM has already completed the trapped Realm instruction. Install
+	 * disposable AArch64 exception-return state for the PC adjustment made
+	 * by the existing early VGIC dispatcher, and restore both views before
+	 * returning to the Realm plumbing.
+	 */
+	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h;
+	write_sysreg_el2(0, SYS_ELR);
+	write_sysreg_el2(PSR_MODE_EL1h, SYS_SPSR);
+
+	handled = __vgic_v3_perform_cpuif_access(vcpu);
+
+	write_sysreg_el2(elr, SYS_ELR);
+	write_sysreg_el2(spsr, SYS_SPSR);
+	*vcpu_pc(vcpu) = pc;
+	*vcpu_cpsr(vcpu) = pstate;
+
+	return handled;
+}
+
+static bool noinstr rec_handle_vgic_cpuif_exit(struct kvm_vcpu *vcpu)
+{
+	struct realm_rec *rec = &vcpu->arch.rec;
+	u64 esr;
+
+	if (!static_branch_unlikely(&vgic_v3_cpuif_trap))
+		return false;
+
+	esr = kvm_vcpu_get_esr(vcpu);
+	if (rec->run->exit.exit_reason != RMI_EXIT_SYNC ||
+	    ESR_ELx_EC(esr) != ESR_ELx_EC_SYS64)
+		return false;
+
+	if (rec_perform_vgic_cpuif_access(vcpu) != 1)
+		return false;
+
+	kvm_rec_complete_sysreg_access(vcpu);
+
+	/*
+	 * The emulation may have updated ICH_HCR_EL2.EOIcount. Synchronize that
+	 * update before reading ICH_HCR_EL2 again to enable the CPU interface.
+	 */
+	isb();
+	sysreg_clear_set_s(SYS_ICH_HCR_EL2, 0, ICH_HCR_EL2_En);
+
+	return true;
+}
+
 int noinstr kvm_rec_enter(struct kvm_vcpu *vcpu)
 {
 	struct realm_rec *rec = &vcpu->arch.rec;
@@ -1406,14 +1469,16 @@ int noinstr kvm_rec_enter(struct kvm_vcpu *vcpu)
 	local_daif_mask();
 	pmr_sync();
 
-	ret = rmi_rec_enter(rec->rec_phys, rec->run_phys);
+	do {
+		ret = rmi_rec_enter(rec->rec_phys, rec->run_phys);
+		if (ret)
+			break;
 
-	local_daif_restore(DAIF_PROCCTX_NOIRQ);
-
-	if (!ret) {
 		load_realm_timer_state(vcpu);
 		rec_prepare_exit_state(vcpu);
-	}
+	} while (rec_handle_vgic_cpuif_exit(vcpu));
+
+	local_daif_restore(DAIF_PROCCTX_NOIRQ);
 
 	return ret;
 }
