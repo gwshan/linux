@@ -466,6 +466,7 @@ struct kvm_arch {
 	/* Nested virtualization info */
 	struct dentry *debugfs_nv_dentry;
 #endif
+
 };
 
 struct kvm_vcpu_fault_info {
