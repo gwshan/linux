@@ -94,6 +94,7 @@ struct realm_rec {
 	struct rmi_sro_state *sro;
 };
 
+void kvm_init_rmi(void);
 u32 kvm_rmm_ipa_limit(void);
 
 int kvm_init_realm(struct kvm *kvm);
