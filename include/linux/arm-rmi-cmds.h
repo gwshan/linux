@@ -67,6 +67,11 @@ static __always_inline void rmi_smccc_invoke_once(struct arm_smccc_1_2_regs *reg
 
 unsigned long rmi_feat_reg(unsigned int index);
 
+static inline bool rmi_has_feature(unsigned int index, unsigned long feature)
+{
+	return !!(rmi_feat_reg(index) & feature);
+}
+
 int rmi_delegate_range(phys_addr_t phys, unsigned long size,
 		       phys_addr_t *out_phys);
 int rmi_undelegate_range(phys_addr_t phys, unsigned long size);

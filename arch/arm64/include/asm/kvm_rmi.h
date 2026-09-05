@@ -56,4 +56,6 @@ struct realm {
 	enum realm_state state;
 };
 
+void kvm_init_rmi(void);
+
 #endif /* __ASM_KVM_RMI_H */
