@@ -290,6 +290,10 @@ static void kvm_arch_fix_timer_offsets(struct kvm *kvm)
 static int kvm_init_vm_flavor(struct kvm *kvm, unsigned long type)
 {
 	bool protected = type & KVM_VM_TYPE_ARM_PROTECTED;
+	bool realm = type & KVM_VM_TYPE_ARM_REALM;
+
+	if (protected && realm)
+		return -EINVAL;
 
 	if (is_protected_kvm_enabled()) {
 		if (protected)
@@ -298,6 +302,11 @@ static int kvm_init_vm_flavor(struct kvm *kvm, unsigned long type)
 			kvm->arch.vm_flavor = VM_PKVM;
 	} else if (protected) {
 		return -EINVAL;
+	} else if (realm) {
+		if (!static_key_enabled(&kvm_rmi_is_available))
+			return -EINVAL;
+		kvm_set_realm_state(kvm, REALM_STATE_NONE);
+		kvm->arch.vm_flavor = VM_REALM;
 	} else if (has_vhe()) {
 		kvm->arch.vm_flavor = VM_VHE;
 	} else {
