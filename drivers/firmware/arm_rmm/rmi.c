@@ -762,6 +762,7 @@ static int rmi_configure(void)
 static int __init arm64_init_rmi(void)
 {
 	int ret;
+	struct rmi_sro_state *sro __free(kfree) = NULL;
 
 	/* Continue without realm support if we can't agree on a version */
 	ret = rmi_check_version();
@@ -776,7 +777,18 @@ static int __init arm64_init_rmi(void)
 	if (ret)
 		return ret;
 
-	return 0;
+	/* Activate the RMM */
+	sro = kmalloc_obj(*sro);
+	if (!sro)
+		return -ENOMEM;
+
+	ret = rmi_sro_memxfer_cmd(sro, GFP_KERNEL, SMC_RMI_RMM_ACTIVATE);
+	if (ret) {
+		pr_err("RMM activate failed\n");
+		ret = ret < 0 ? ret : -ENXIO;
+	}
+
+	return ret;
 }
 
 /*
