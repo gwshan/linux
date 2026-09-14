@@ -72,69 +72,6 @@ static inline long rmi_granule_range_undelegate(unsigned long base,
 }
 
 /**
- * rmi_granule_tracking_get() - Get configuration of a Granule tracking region
- * @start: Base PA of the tracking region
- * @end: End of the PA region
- * @out_category: Memory category
- * @out_state: Tracking region state
- * @out_top: Top of the memory region
- *
- * Return: RMI return code
- */
-static inline int rmi_granule_tracking_get(unsigned long start,
-					   unsigned long end,
-					   unsigned long *out_category,
-					   unsigned long *out_state,
-					   unsigned long *out_top)
-{
-	struct arm_smccc_1_2_regs regs = {
-		SMC_RMI_GRANULE_TRACKING_GET, start, end,
-	};
-
-	rmi_smccc_invoke(&regs);
-
-	if (regs.a0 != RMI_SUCCESS)
-		return regs.a0;
-
-	if (out_category)
-		*out_category = regs.a1;
-	if (out_state)
-		*out_state = regs.a2;
-	if (out_top)
-		*out_top = regs.a3;
-
-	return RMI_SUCCESS;
-}
-
-/*
- * rmi_gpt_info - Query the GPT info for the given PAR.
- * @start: Base of the physical address region
- * @top: Top of the physical address region
- * @out_top: Top of the phyiscal address region for which
- *		the GPT @out_gpt_par_state is valid
- * @out_gpt_par_state: State of the GPT covered by [start, out_top)
- */
-static inline long rmi_gpt_info(unsigned long start, unsigned long end,
-				unsigned long *out_top,
-				unsigned long *out_gpt_par_state)
-{
-	struct arm_smccc_1_2_regs regs = {
-		SMC_RMI_GPT_INFO, start, end,
-	};
-
-	rmi_smccc_invoke(&regs);
-	if (regs.a0 != RMI_SUCCESS)
-		return regs.a0;
-
-	if (out_top)
-		*out_top = regs.a1;
-	if (out_gpt_par_state)
-		*out_gpt_par_state = regs.a2;
-
-	return RMI_SUCCESS;
-}
-
-/**
  * rmi_features() - Read feature register
  * @index: Feature register index
  * @out: Feature register value is written to this pointer
@@ -831,21 +768,26 @@ static int rmi_configure(void)
  */
 static int rmi_verify_memory_tracking(phys_addr_t start, phys_addr_t end)
 {
-	while (start < end) {
-		unsigned long ret, category, state, next;
+	struct arm_smccc_1_2_regs args;
 
-		ret = rmi_granule_tracking_get(start, end, &category, &state, &next);
-		if (ret != RMI_SUCCESS)
+	while (start < end) {
+		args.a0 = SMC_RMI_GRANULE_TRACKING_GET;
+		args.a1 = start;
+		args.a2 = end;
+		rmi_smccc_invoke(&args);
+
+		if (args.a0 != RMI_SUCCESS)
 			return -ENOMEM;
 
-		if (state != RMI_TRACKING_FINE ||
-		    category != RMI_MEM_CATEGORY_CONVENTIONAL) {
+		if (args.a1 != RMI_MEM_CATEGORY_CONVENTIONAL ||
+		    args.a2 != RMI_TRACKING_FINE) {
 			/* TODO: Set granule tracking in this case */
 			pr_err("Granule tracking for region isn't fine/conventional: %llx-%lx\n",
-			       start, next);
+				start, args.a3);
 			return -ENODEV;
 		}
-		start = next;
+
+		start = args.a3;
 	}
 
 	return 0;
@@ -857,8 +799,8 @@ static int rmi_verify_memory_tracking(phys_addr_t start, phys_addr_t end)
  */
 static int rmi_verify_gpt_firmware_managed(phys_addr_t start, phys_addr_t end)
 {
+	struct arm_smccc_1_2_regs args;
 	unsigned long l0gpt_sz;
-	unsigned long next, par_state;
 
 	l0gpt_sz = 1UL << (30 + FIELD_GET(RMI_FEATURE_REGISTER_1_L0GPTSZ,
 					  rmi_feat_reg(1)));
@@ -866,17 +808,20 @@ static int rmi_verify_gpt_firmware_managed(phys_addr_t start, phys_addr_t end)
 	end = ALIGN(end, l0gpt_sz);
 
 	while (start < end) {
-		long ret = rmi_gpt_info(start, end, &next, &par_state);
-
-		if (ret != RMI_SUCCESS)
+		args.a0 = SMC_RMI_GPT_INFO;
+		args.a1 = start;
+		args.a2 = end;
+		rmi_smccc_invoke(&args);
+		if (args.a0 != RMI_SUCCESS)
 			return -ENOMEM;
 
-		if (par_state != RMI_GPT_PAR_PLAT) {
+		if (args.a2 != RMI_GPT_PAR_PLAT) {
 			pr_err("GPT for the region is not managed by firmware %llx-%lx\n",
-				start, next);
-			return -ENOMEM;
+				start, args.a1);
+			return -ENODEV;
 		}
-		start = next;
+
+		start = args.a2;
 	}
 
 	return 0;
