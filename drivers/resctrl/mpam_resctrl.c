@@ -786,7 +786,10 @@ static u32 get_mba_min(struct mpam_props *cprops)
 /* Find the L3 cache that has affinity with this CPU */
 static int find_l3_equivalent_bitmask(int cpu, cpumask_var_t tmp_cpumask)
 {
-	u32 cache_id = get_cpu_cacheinfo_id(cpu, 3);
+	u32 cache_id;
+
+	if (!mpam_cpu_cache_id(cpu, 3, &cache_id))
+		return -ENOENT;
 
 	lockdep_assert_cpus_held();
 
@@ -907,7 +910,7 @@ static bool traffic_matches_l3(struct mpam_class *class)
 	}
 
 	/* Be strict; the traffic might stop in the intermediate cache. */
-	if (get_cpu_cacheinfo_id(cpu, 4) != -1) {
+	if (!mpam_cpu_cache_id(cpu, 4, NULL)) {
 		pr_debug("L3 isn't the last level of cache\n");
 		return false;
 	}
@@ -1255,10 +1258,10 @@ static int mpam_resctrl_pick_domain_id(int cpu, struct mpam_component *comp)
 
 	if (topology_matches_l3(class)) {
 		/* Use the corresponding L3 component ID as the domain ID */
-		int id = get_cpu_cacheinfo_id(cpu, 3);
+		int id;
 
 		/* Implies topology_matches_l3() made a mistake */
-		if (WARN_ON_ONCE(id == -1))
+		if (WARN_ON_ONCE(!mpam_cpu_cache_id(cpu, 3, id)))
 			return comp->comp_id;
 
 		return id;
@@ -1318,7 +1321,7 @@ static int mpam_resctrl_monitor_init(struct mpam_resctrl_mon *mon,
 	 * The check just requires any online CPU and it can't go offline as we
 	 * hold the cpu lock.
 	 */
-	if (get_cpu_cacheinfo_id(raw_smp_processor_id(), 3) == -1)
+	if (!mpam_cpu_cache_id(raw_smp_processor_id(), 3, NULL))
 		return 0;
 
 	/*
@@ -1734,8 +1737,7 @@ static struct mpam_resctrl_dom *mpam_resctrl_get_mon_domain_from_cpu(int cpu)
 
 	if (!l3->class)
 		return NULL;
-	cache_id = get_cpu_cacheinfo_id(cpu, 3);
-	if (cache_id < 0)
+	if (!mpam_cpu_cache_id(cpu, 3, &cache_id))
 		return NULL;
 
 	list_for_each_entry_rcu(dom, &l3->resctrl_res.mon_domains, resctrl_mon_dom.hdr.list) {

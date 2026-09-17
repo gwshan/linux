@@ -7,6 +7,7 @@
 #include <linux/arm_mpam.h>
 #include <linux/atomic.h>
 #include <linux/bitmap.h>
+#include <linux/cacheinfo.h>
 #include <linux/cpumask.h>
 #include <linux/io.h>
 #include <linux/jump_label.h>
@@ -40,6 +41,19 @@ struct platform_device;
 static inline bool mpam_is_enabled(void)
 {
 	return static_branch_likely(&mpam_enabled);
+}
+
+static inline bool mpam_cpu_cache_id(int cpu, int level, unsigned int *id)
+{
+	struct cacheinfo *ci = get_cpu_cacheinfo_level(cpu, level);
+
+	if (!ci)
+		return false;
+
+	if (id)
+		*id = ci->id;
+
+	return true;
 }
 
 /*
