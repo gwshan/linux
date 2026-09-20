@@ -76,6 +76,7 @@ static inline bool kvm_realm_ext_allowed(long ext)
 	case KVM_CAP_ARM_PTRAUTH_ADDRESS:
 	case KVM_CAP_ARM_PTRAUTH_GENERIC:
 	case KVM_CAP_SYNC_MMU:
+	case KVM_CAP_ARM_RMI:
 		return true;
 	}
 	return false;
