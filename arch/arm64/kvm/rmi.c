@@ -14,6 +14,11 @@
 #include <asm/kvm_pgtable.h>
 #include <asm/virt.h>
 
+bool kvm_rmi_supports_sve(void)
+{
+	return rmi_has_feature(0, RMI_FEATURE_REGISTER_0_SVE);
+}
+
 u32 kvm_rmm_ipa_limit(void)
 {
 	return u64_get_bits(rmi_feat_reg(0), RMI_FEATURE_REGISTER_0_S2SZ);
