@@ -2718,6 +2718,18 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
 	}
 }
 
+static bool kvm_prevents_memslot_change(struct kvm *kvm, enum kvm_mr_change change)
+{
+	/* Cannot modify memslots once a pVM has run or Realm created */
+	if (change != KVM_MR_DELETE && change != KVM_MR_MOVE)
+		return false;
+
+	if ((kvm_vm_is_protected_pkvm(kvm) && pkvm_hyp_vm_is_created(kvm)) ||
+	     kvm_realm_is_created(kvm))
+		return true;
+	return false;
+}
+
 int kvm_arch_prepare_memory_region(struct kvm *kvm,
 				   const struct kvm_memory_slot *old,
 				   struct kvm_memory_slot *new,
@@ -2726,12 +2738,9 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 	hva_t hva, reg_end;
 	int ret = 0;
 
-	if (kvm_vm_is_protected_pkvm(kvm)) {
-		/* Cannot modify memslots once a pVM has run. */
-		if (pkvm_hyp_vm_is_created(kvm) &&
-		    (change == KVM_MR_DELETE || change == KVM_MR_MOVE)) {
+	if (kvm_vm_is_protected(kvm)) {
+		if (kvm_prevents_memslot_change(kvm, change))
 			return -EPERM;
-		}
 
 		if (new &&
 		    new->flags & (KVM_MEM_LOG_DIRTY_PAGES | KVM_MEM_READONLY)) {

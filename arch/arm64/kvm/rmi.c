@@ -1196,6 +1196,7 @@ int kvm_activate_realm(struct kvm *kvm)
 	if (kvm_realm_state(kvm) >= REALM_STATE_ACTIVE)
 		return 0;
 
+	guard(mutex)(&kvm->slots_lock);
 	guard(mutex)(&kvm->arch.config_lock);
 	/* Check again with the lock held */
 	if (kvm_realm_state(kvm) >= REALM_STATE_ACTIVE)
