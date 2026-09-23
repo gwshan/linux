@@ -1545,11 +1545,34 @@ struct kvm *kvm_arch_alloc_vm(void);
 #define __KVM_HAVE_ARCH_FLUSH_REMOTE_TLBS_RANGE
 
 #define kvm_vm_is_protected(kvm)	((kvm)->arch.vm_flavor >= __VM_PROTECTED)
-#define vcpu_is_protected(vcpu)		kvm_vm_is_protected((vcpu)->kvm)
+#define vcpu_is_protected(vcpu)						\
+	({                                                              \
+		struct kvm *__kvm = READ_ONCE((vcpu)->kvm);             \
+		bool __protected = false;                               \
+									\
+		if (__kvm) {                                            \
+			if (is_nvhe_hyp_code() &&			\
+			    !is_protected_kvm_enabled())		\
+				__kvm = kern_hyp_va(__kvm);             \
+									\
+			__protected = kvm_vm_is_protected(__kvm);       \
+		}                                                       \
+									\
+		__protected;						\
+	})
 
 #define kvm_vm_is_protected_pkvm(kvm)		\
 	(is_protected_kvm_enabled() && ((kvm)->arch.vm_flavor == VM_PROTECTED_PKVM))
-#define vcpu_is_protected_pkvm(vcpu)	kvm_vm_is_protected_pkvm(vcpu->kvm)
+#define vcpu_is_protected_pkvm(vcpu)					\
+	({                                                              \
+		struct kvm *__kvm = READ_ONCE((vcpu)->kvm);             \
+		bool __protected = false;                               \
+									\
+		if (__kvm)						\
+			__protected = kvm_vm_is_protected_pkvm(__kvm);	\
+									\
+		__protected;						\
+	})
 
 #define kvm_vm_is_unprotected_pkvm(kvm)		\
 	(is_protected_kvm_enabled() && ((kvm)->arch.vm_flavor == VM_PKVM))
