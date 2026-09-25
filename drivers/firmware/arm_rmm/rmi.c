@@ -53,15 +53,16 @@ int rmi_undelegate_range(phys_addr_t phys,
 
 	while (phys < top) {
 		ret = rmi_granule_range_undelegate(phys, top, &out_top);
+		if (ret != RMI_SUCCESS)
+			break;
 
-		if (ret == RMI_SUCCESS) {
-			/* Buggy RMM ? Let the caller leak the pages */
-			if (WARN_ON(out_top <= phys))
-				return -ENXIO;
-			phys = out_top;
-		} else {
+		/* Buggy RMM ? Let the caller leak the pages */
+		if (WARN_ON(out_top <= phys)) {
+			ret = -ENXIO;
 			break;
 		}
+
+		phys = out_top;
 	}
 
 	return ret;
@@ -121,24 +122,22 @@ int rmi_delegate_range(phys_addr_t phys,
 
 	while (phys < top) {
 		ret = rmi_granule_range_delegate(phys, top, &out_top);
+		if (ret != RMI_SUCCESS)
+			break;
 
-		if (ret == RMI_SUCCESS) {
-			/*
-			 * Buggy RMM ? Let the caller handle the failure.
-			 * We can't know how far the RMM delegated in this
-			 * iteration, so we return the best known good limit.
-			 * RMM can deal with granules already in "undelegated"
-			 * in a given range. So, it is fine for the caller to
-			 * try the range we return.
-			 */
-			if (WARN_ON(out_top <= phys)) {
-				ret = -ENXIO;
-				break;
-			}
-			phys = out_top;
-		} else {
+		/*
+		 * Buggy RMM? Let the caller handle the failure. We can't
+		 * know how far the RMM delegated in this iteration, so we
+		 * return the best known good limit. RMM can deal with granules
+		 * already in "undelegated" in a given range. So it is fine
+		 * for the caller to try the range we return.
+		 */
+		if (WARN_ON(out_top <= phys)) {
+			ret = -ENXIO;
 			break;
 		}
+
+		phys = out_top;
 	}
 
 	if (out_phys)
@@ -285,7 +284,6 @@ static int rmi_sro_donate_contig(struct rmi_sro_state *sro,
 	unsigned long state = RMI_DONATE_STATE(donatereq);
 	unsigned long size = block_size * count;
 	unsigned long addr_range;
-	unsigned long donated_granules;
 	unsigned long donated_size;
 	int ret;
 	void *virt;
@@ -344,18 +342,16 @@ mem_donate:
 	rmi_op_mem_donate(sro_handle,
 			  virt_to_phys(&sro->addr_list[sro->addr_count]), 1,
 			  0, out_regs);
-	donated_granules = out_regs->a1;
-
-	if (WARN_ON(donated_granules > (size >> PAGE_SHIFT)))
-		donated_granules = (size >> PAGE_SHIFT);
-
-	donated_size = donated_granules << PAGE_SHIFT;
+	donated_size = out_regs->a1 << PAGE_SHIFT;
+	if (WARN_ON(donated_size > size))
+		donated_size = size;
 
 	/* All granules consumed by the RMM */
 	if (donated_size == size)
 		return 0;
+
 	/* No granules were consumed by the RMM, cache them */
-	if (donated_granules == 0) {
+	if (donated_size == 0) {
 		sro->addr_count++;
 		return 0;
 	}
