@@ -191,6 +191,12 @@ static int kvm_vm_flush_remote_tlbs(struct kvm *kvm)
 	return 0;
 }
 
+static int realm_flush_remote_tlbs(struct kvm *kvm)
+{
+	/* Nothing to do here, RMM does the job */
+	return 0;
+}
+
 /**
  * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries for v7/8
  * @kvm:	pointer to kvm structure.
@@ -215,6 +221,13 @@ static int kvm_vm_flush_remote_tlbs_range(struct kvm *kvm,
 	u64 addr = gfn << PAGE_SHIFT;
 
 	kvm_tlb_flush_vmid_range(&kvm->arch.mmu, addr, size);
+	return 0;
+}
+
+static int realm_flush_remote_tlbs_range(struct kvm *kvm,
+					 gfn_t gfn, u64 nr_pages)
+{
+	/* Nothing to do here, RMM does the job */
 	return 0;
 }
 
@@ -351,6 +364,15 @@ static void no_stage2_unmap_range(struct kvm_s2_mmu *mmu,
 				  phys_addr_t start, u64 size, bool may_block,
 				  enum kvm_gfn_range_filter filter)
 {
+}
+
+static void realm_stage2_unmap_range(struct kvm_s2_mmu *mmu,
+				     phys_addr_t start, u64 size, bool may_block,
+				     enum kvm_gfn_range_filter filter)
+{
+	struct kvm *kvm = kvm_s2_mmu_to_kvm(mmu);
+
+	kvm_realm_unmap_range_filter(kvm, start, size, may_block, filter);
 }
 
 /*
@@ -1052,6 +1074,17 @@ static void pkvm_stage2_destroy(struct kvm_pgtable *pgt)
 {
 	stage2_destroy_range(pgt, pkvm_pgtable_stage2_destroy_range);
 	pkvm_pgtable_stage2_destroy_pgd(pgt);
+}
+
+static void realm_stage2_destroy(struct kvm_pgtable *pgt)
+{
+	/*
+	 * Realm RTTs are inaccessible to the host and may contain stale data
+	 * after the RMM has released them. The non-root RTTs are explicitly
+	 * destroyed through RMI before the RD is destroyed; only the root PGD
+	 * pages remain to be freed here.
+	 */
+	kvm_pgtable_stage2_destroy_pgd(pgt);
 }
 
 static void kvm_stage2_destroy(struct kvm_pgtable *pgt)
@@ -3300,6 +3333,16 @@ static const struct kvm_vm_s2_ops kvm_default_vm_s2_ops = {
 	.vm_mem_abort			= kvm_vm_mem_abort,
 };
 
+static const struct kvm_vm_s2_ops realm_vm_s2_ops = {
+	.vm_stage2_destroy		= realm_stage2_destroy,
+	.vm_flush_remote_tlbs		= realm_flush_remote_tlbs,
+	.vm_flush_remote_tlbs_range	= realm_flush_remote_tlbs_range,
+	.vm_age_gfn			= no_age_gfn,
+	.vm_test_age_gfn		= no_age_gfn,
+	.vm_stage2_unmap_range		= realm_stage2_unmap_range,
+	.vm_mem_abort			= kvm_vm_mem_abort,
+};
+
 #define KVM_VM_S2_OPS(flavor, ops)		\
 		[(flavor)] = &(ops)
 
@@ -3308,7 +3351,7 @@ static const struct kvm_vm_s2_ops *arm64_vm_s2_ops[] = {
 	KVM_VM_S2_OPS(VM_NVHE, kvm_default_vm_s2_ops),
 	KVM_VM_S2_OPS(VM_PKVM, pkvm_vm_s2_ops),
 	KVM_VM_S2_OPS(VM_PROTECTED_PKVM, protected_pkvm_vm_s2_ops),
-	[VM_REALM] = NULL,
+	KVM_VM_S2_OPS(VM_REALM, realm_vm_s2_ops),
 };
 
 static int kvm_vm_init_vm_s2_ops(struct kvm *kvm)
