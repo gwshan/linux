@@ -42,6 +42,7 @@
 #include <asm/kvm_nested.h>
 #include <asm/kvm_pkvm.h>
 #include <asm/kvm_ptrauth.h>
+#include <asm/kvm_rmi.h>
 #include <asm/sections.h>
 #include <asm/stacktrace/nvhe.h>
 
@@ -111,6 +112,8 @@ long kvm_get_cap_for_kvm_ioctl(unsigned int ioctl, long *ext)
 
 	return -EINVAL;
 }
+
+DEFINE_STATIC_KEY_FALSE(kvm_rmi_is_available);
 
 DECLARE_KVM_HYP_PER_CPU(unsigned long, kvm_hyp_vector);
 
@@ -1685,10 +1688,17 @@ static unsigned long system_supported_vcpu_features(struct kvm_vcpu *vcpu)
 {
 	unsigned long features;
 
-	if (vcpu->kvm->arch.vm_flavor == VM_PROTECTED_PKVM)
+	switch (vcpu->kvm->arch.vm_flavor) {
+	case VM_PROTECTED_PKVM:
 		features = KVM_PROTECTED_VCPU_VALID_FEATURES;
-	else
+		break;
+	case VM_REALM:
+		features = KVM_REALM_VCPU_VALID_FEATURES;
+		break;
+	default:
 		features = KVM_VCPU_VALID_FEATURES;
+		break;
+	}
 
 	if (!cpus_have_final_cap(ARM64_HAS_32BIT_EL1))
 		clear_bit(KVM_ARM_VCPU_EL1_32BIT, &features);
@@ -2242,6 +2252,7 @@ static const struct kvm_vcpu_ops *arm64_vcpu_ops[] = {
 	KVM_VCPU_OPS(VM_VHE, vhe_vcpu_ops),
 	KVM_VCPU_OPS(VM_PKVM, pkvm_vcpu_ops),
 	KVM_VCPU_OPS(VM_PROTECTED_PKVM, pkvm_vcpu_ops),
+	KVM_VCPU_OPS(VM_REALM, realm_vcpu_ops),
 };
 
 static void kvm_init_vcpu_ops(struct kvm_vcpu *vcpu)
@@ -3194,6 +3205,8 @@ static __init int kvm_arm_init(void)
 	}
 
 	in_hyp_mode = is_kernel_in_hyp_mode();
+
+	kvm_init_rmi();
 
 	if (cpus_have_final_cap(ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE) ||
 	    cpus_have_final_cap(ARM64_WORKAROUND_1508412))
