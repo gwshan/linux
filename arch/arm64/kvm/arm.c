@@ -877,7 +877,8 @@ static void __kvm_arm_vcpu_power_off(struct kvm_vcpu *vcpu, u32 mp_state)
 /* The guest's own CPU_OFF: EL2 has already powered the vCPU off. */
 void kvm_arm_vcpu_power_off(struct kvm_vcpu *vcpu)
 {
-	u32 mp_state = vcpu_is_protected(vcpu) ? KVM_MP_STATE_UNINITIALIZED : KVM_MP_STATE_STOPPED;
+	u32 mp_state = vcpu_is_protected_pkvm(vcpu) ?
+		       KVM_MP_STATE_UNINITIALIZED : KVM_MP_STATE_STOPPED;
 
 	spin_lock(&vcpu->arch.mp_state_lock);
 	__kvm_arm_vcpu_power_off(vcpu, mp_state);
@@ -906,7 +907,8 @@ static bool kvm_arm_vcpu_suspended(struct kvm_vcpu *vcpu)
 /* Only the guest's CPU_ON may start a vCPU EL2 holds powered off. */
 bool kvm_pkvm_vcpu_is_powered_off(struct kvm_vcpu *vcpu)
 {
-	return READ_ONCE(vcpu->arch.mp_state.mp_state) == KVM_MP_STATE_UNINITIALIZED;
+	return vcpu_is_protected_pkvm(vcpu) &&
+		READ_ONCE(vcpu->arch.mp_state.mp_state) == KVM_MP_STATE_UNINITIALIZED;
 }
 
 int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
@@ -2312,6 +2314,7 @@ static const struct kvm_vcpu_ops *arm64_vcpu_ops[] = {
 	KVM_VCPU_OPS(VM_VHE, vhe_vcpu_ops),
 	KVM_VCPU_OPS(VM_PKVM, pkvm_vcpu_ops),
 	KVM_VCPU_OPS(VM_PROTECTED_PKVM, pkvm_vcpu_ops),
+	[VM_REALM] = NULL,
 };
 
 static void kvm_init_vcpu_ops(struct kvm_vcpu *vcpu)
