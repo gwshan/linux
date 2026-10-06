@@ -29,6 +29,7 @@
 #include <asm/kvm.h>
 #include <asm/kvm_asm.h>
 #include <asm/kvm_hcall.h>
+#include <asm/kvm_rmi.h>
 #include <asm/vncr_mapping.h>
 
 #define __KVM_HAVE_ARCH_INTC_INITIALIZED
@@ -409,6 +410,7 @@ enum kvm_arm_vm_flavor {
 	VM_PKVM,		/* Normal guests on pKVM */
 	MARKER(__VM_PROTECTED),
 	VM_PROTECTED_PKVM,	/* Protected VM */
+	VM_REALM,		/* CCA */
 	VM_FLAVOR_MAX
 };
 
@@ -502,11 +504,14 @@ struct kvm_arch {
 	/* Count the number of VNCR_EL2 TLBs */
 	atomic_t vncr_tlb_count;
 
-	/*
-	 * For an untrusted host VM, 'pkvm.handle' is used to lookup
-	 * the associated pKVM instance in the hypervisor.
-	 */
-	struct kvm_protected_vm pkvm;
+	union {
+		/*
+		 * For an untrusted host VM, 'pkvm.handle' is used to lookup
+		 * the associated pKVM instance in the hypervisor.
+		 */
+		struct kvm_protected_vm pkvm;
+		struct realm realm;
+	};
 
 #ifdef CONFIG_PTDUMP_STAGE2_DEBUGFS
 	/* Nested virtualization info */
@@ -1572,30 +1577,38 @@ struct kvm *kvm_arch_alloc_vm(void);
 
 #define __KVM_HAVE_ARCH_FLUSH_REMOTE_TLBS_RANGE
 
-#ifdef __KVM_NVHE_HYPERVISOR__
+#define kvm_vm_is_protected(kvm)	((kvm)->arch.vm_flavor >= __VM_PROTECTED)
 
-#define kvm_vm_is_protected(kvm)			\
-	(is_protected_kvm_enabled() && ((kvm)->arch.vm_flavor == VM_PROTECTED_PKVM))
+#ifdef __KVM_NVHE_HYPERVISOR__
 /*
  * Accessing vcpu->kvm from nVHE hyp stub is tricky, as we need to convert the
  * pointer to the hyp VA. With pKVM, the nVHE code runs with the hyp_vcpu,
- * which is populated correctly and is gated on is_protected_kvm_enabled().
+ * which is populated correctly. Always vcpu_is_protected_pkvm(), which is
+ * gated on is_protected_kvm_enabled().
  */
-#define vcpu_is_protected(vcpu)						\
+#define vcpu_is_protected(vcpu)		BUILD_BUG_ON(1)
+#else
+#define vcpu_is_protected(vcpu)		kvm_vm_is_protected((vcpu)->kvm)
+#endif
+
+#define kvm_vm_is_protected_pkvm(kvm)					\
+	(is_protected_kvm_enabled() && ((kvm)->arch.vm_flavor == VM_PROTECTED_PKVM))
+
+/*
+ * Rely on is_protected_kvm_enabled() check in kvm_vm_is_protected_pkvm() to
+ * make sure the vcpu->kvm is always valid VA in the context
+ */
+#define vcpu_is_protected_pkvm(vcpu)					\
 	({								\
 		struct kvm *__kvm = READ_ONCE((vcpu)->kvm);		\
 									\
-		(__kvm && kvm_vm_is_protected(__kvm));			\
+		(__kvm && kvm_vm_is_protected_pkvm(__kvm));		\
 	})
 
-#else
-
-#define kvm_vm_is_protected(kvm)	((kvm)->arch.vm_flavor >= __VM_PROTECTED)
-#define vcpu_is_protected(vcpu)		kvm_vm_is_protected((vcpu)->kvm)
+#define kvm_vm_is_realm(kvm)		((kvm)->arch.vm_flavor == VM_REALM)
+#define vcpu_is_rec(vcpu)		kvm_vm_is_realm((vcpu)->kvm)
 
 #define kvm_vm_hyp_is_distrusting(kvm)	((kvm)->arch.vm_flavor >= __VM_DISTRUSTING_HYP)
-
-#endif	/* __KVM_NVHE_HYPERVISOR__ */
 
 #define kvm_has_mte(kvm)					\
 	(system_supports_mte() &&				\

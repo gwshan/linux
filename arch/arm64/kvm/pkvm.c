@@ -192,7 +192,7 @@ static int __pkvm_create_hyp_vcpu(struct kvm_vcpu *vcpu)
 	 * Mirror EL2's seeding of power_state from mp_state. The hyp vCPU is
 	 * published, so take mp_state_lock against kvm_psci_vcpu_on().
 	 */
-	if (vcpu_is_protected(vcpu)) {
+	if (vcpu_is_protected_pkvm(vcpu)) {
 		spin_lock(&vcpu->arch.mp_state_lock);
 		if (kvm_arm_vcpu_stopped(vcpu))
 			WRITE_ONCE(vcpu->arch.mp_state.mp_state, KVM_MP_STATE_UNINITIALIZED);
