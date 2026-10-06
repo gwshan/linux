@@ -2757,13 +2757,28 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 		}
 	}
 
-	if (kvm->arch.vm_flavor == VM_PROTECTED_PKVM) {
+	switch (kvm->arch.vm_flavor) {
+	case VM_PROTECTED_PKVM:
 		/* Cannot modify memslots once a pVM has run. */
 		if (pkvm_hyp_vm_is_created(kvm) &&
-		    (change == KVM_MR_DELETE || change == KVM_MR_MOVE)) {
+		    (change == KVM_MR_DELETE || change == KVM_MR_MOVE))
 			return -EPERM;
-		}
+		break;
+	case VM_REALM:
+		/*
+		 * Once the Realm is created, we cannot modify any slots that
+		 * could be providing private memory. i.e., guest_memfd backed
+		 * slots.
+		 * TODO: Handle trusted device private memory slots
+		 */
+		if (!kvm_realm_is_created(kvm))
+			break;
 
+		if (kvm_slot_has_gmem(old) || kvm_slot_has_gmem(new))
+			return -EPERM;
+		break;
+	default:
+		break;
 	}
 
 	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE &&
