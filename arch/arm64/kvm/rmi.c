@@ -1050,6 +1050,38 @@ static int kvm_complete_ripas_change(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+static int realm_init_ipa_state(struct kvm *kvm, unsigned long gfn,
+				unsigned long pages)
+{
+	return ripas_change(kvm, NULL, gfn_to_gpa(gfn), gfn_to_gpa(gfn + pages),
+			    RIPAS_INIT, NULL);
+}
+
+static int set_ripas_of_protected_regions(struct kvm *kvm)
+{
+	struct kvm_memslots *slots;
+	struct kvm_memory_slot *memslot;
+	int idx, bkt;
+	int ret = 0;
+
+	lockdep_assert_held(&kvm->arch.config_lock);
+
+	idx = srcu_read_lock(&kvm->srcu);
+	slots = kvm_memslots(kvm);
+	kvm_for_each_memslot(memslot, bkt, slots) {
+		if (!kvm_slot_has_gmem(memslot))
+			continue;
+
+		ret = realm_init_ipa_state(kvm, memslot->base_gfn,
+					   memslot->npages);
+		if (ret)
+			break;
+	}
+	srcu_read_unlock(&kvm->srcu, idx);
+
+	return ret;
+}
+
 int kvm_rec_handle_request(struct kvm_vcpu *vcpu)
 {
 	struct realm_rec *rec = &vcpu->arch.rec;
@@ -1296,6 +1328,7 @@ int kvm_activate_realm(struct kvm *kvm)
 	if (kvm_realm_state(kvm) >= REALM_STATE_ACTIVE)
 		return 0;
 
+	guard(mutex)(&kvm->slots_lock);
 	guard(mutex)(&kvm->arch.config_lock);
 	/* Check again with the lock held */
 	if (kvm_realm_state(kvm) >= REALM_STATE_ACTIVE)
@@ -1321,6 +1354,10 @@ int kvm_activate_realm(struct kvm *kvm)
 		if (ret)
 			goto out_vm_dead;
 	}
+
+	ret = set_ripas_of_protected_regions(kvm);
+	if (ret)
+		goto out_vm_dead;
 
 	ret = rmi_realm_activate(virt_to_phys(realm->rd));
 	if (ret) {
