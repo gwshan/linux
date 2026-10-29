@@ -551,6 +551,241 @@ void kvm_realm_unmap_range_filter(struct kvm *kvm, unsigned long start,
 		realm_unmap_private_range(kvm, start, end, may_block);
 }
 
+static unsigned long addr_range_desc(unsigned long ipa, unsigned long phys,
+				     unsigned long size, unsigned long state)
+{
+	unsigned long count = 1;
+	unsigned long out;
+	int rmi_size;
+
+	for (rmi_size = KVM_PGTABLE_LAST_LEVEL; rmi_size >= 0; rmi_size--) {
+		unsigned long entry_size = rmi_addr_block_size_to_bytes(rmi_size);
+
+		if (size >= entry_size && IS_ALIGNED(ipa, entry_size) &&
+		    IS_ALIGNED(phys, entry_size))
+			break;
+	}
+
+	if (rmi_size == 0) {
+		/*
+		 * Stop at the next block boundary so that a later iteration can
+		 * use a larger mapping when both addresses are aligned.
+		 */
+		count = MIN(size >> PAGE_SHIFT, PTRS_PER_PTE - 1);
+		count = min(count, (PMD_SIZE - (ipa & (PMD_SIZE - 1))) >> PAGE_SHIFT);
+		count = min(count, (PMD_SIZE - (phys & (PMD_SIZE - 1))) >> PAGE_SHIFT);
+	}
+
+	WARN_ON(phys & ~PAGE_MASK);
+
+	out = FIELD_PREP(RMI_ADDR_RANGE_BLOCK_SIZE_MASK, rmi_size) |
+	      FIELD_PREP(RMI_ADDR_RANGE_COUNT_MASK, count) |
+	      FIELD_PREP(RMI_ADDR_RANGE_STATE_MASK, state);
+	out |= phys & PAGE_MASK;
+
+	return out;
+}
+
+static int realm_map_protected(struct kvm *kvm,
+			       unsigned long ipa,
+			       kvm_pfn_t pfn,
+			       unsigned long map_size,
+			       struct kvm_mmu_memory_cache *memcache)
+{
+	struct realm *realm = &kvm->arch.realm;
+	phys_addr_t phys = __pfn_to_phys(pfn);
+	phys_addr_t base_phys = phys;
+	phys_addr_t rd = virt_to_phys(realm->rd);
+	phys_addr_t delegated_phys;
+	unsigned long base_ipa = ipa;
+	unsigned long ipa_top;
+	long ret = 0;
+
+	if (WARN_ON(!IS_ALIGNED(map_size, PAGE_SIZE) ||
+		    !IS_ALIGNED(ipa, map_size)))
+		return -EINVAL;
+
+	if (rmi_delegate_range(phys, map_size, &delegated_phys)) {
+		if (delegated_phys == phys) {
+			/*
+			 * It's likely we raced with another VCPU on the same
+			 * fault. Assume the other VCPU has handled the fault
+			 * and return to the guest.
+			 */
+			return 0;
+		}
+		/* Partial delegation - map as much as we can */
+		map_size = delegated_phys - phys;
+	}
+
+	ipa_top = ipa + map_size;
+
+	while (ipa < ipa_top) {
+		unsigned long flags = RMI_ADDR_TYPE_SINGLE;
+		unsigned long range_desc = addr_range_desc(ipa, phys, ipa_top - ipa,
+							   RMI_OP_MEM_DELEGATED);
+		unsigned long out_top;
+
+		ret = rmi_rtt_data_map(rd, ipa, ipa_top, flags, range_desc,
+				       &out_top);
+		if (ret < 0)
+			goto err_undelegate;
+
+		if (RMI_RESULT_STATUS(ret) == RMI_ERROR_RTT) {
+			/* Create missing RTTs and retry */
+			int level = RMI_RESULT_DATA_LEVEL(ret);
+
+			if (WARN_ON(level >= KVM_PGTABLE_LAST_LEVEL))
+				goto err_undelegate;
+			ret = realm_create_rtt_levels(realm, ipa, level,
+						      level + 1,
+						      memcache);
+			if (ret)
+				goto err_undelegate;
+
+			continue;
+		}
+
+		if (WARN_ON(ret))
+			goto err_undelegate;
+
+		/* An IRQ can stop the RMM before it maps the first entry. */
+		if (out_top == ipa) {
+			ret = -EAGAIN;
+			goto err_undelegate;
+		}
+		if (WARN_ON_ONCE(out_top < ipa || out_top > ipa_top)) {
+			ret = -ENXIO;
+			goto err_undelegate;
+		}
+
+		phys += out_top - ipa;
+		ipa = out_top;
+	}
+
+	return 0;
+
+err_undelegate:
+	realm_unmap_private_range(kvm, base_ipa, ipa, false);
+	/* A range which cannot be undelegated remains owned by the RMM. */
+	WARN_ON(rmi_undelegate_range(base_phys, map_size));
+	return ret < 0 ? ret : -ENXIO;
+}
+
+static int realm_map_unprotected(struct kvm *kvm,
+				 unsigned long ipa,
+				 kvm_pfn_t pfn,
+				 unsigned long size,
+				 enum kvm_pgtable_prot prot,
+				 struct kvm_mmu_memory_cache *memcache)
+{
+	struct realm *realm = &kvm->arch.realm;
+	unsigned long attr, flags = 0;
+	phys_addr_t rd = virt_to_phys(realm->rd);
+	phys_addr_t phys = __pfn_to_phys(pfn);
+	unsigned long ipa_top = ipa + size;
+	unsigned int retries = 0;
+	long ret;
+
+	if (WARN_ON(!IS_ALIGNED(size, PAGE_SIZE)))
+		return -EINVAL;
+
+	switch (prot & (KVM_PGTABLE_PROT_DEVICE | KVM_PGTABLE_PROT_NORMAL_NC)) {
+	case KVM_PGTABLE_PROT_DEVICE | KVM_PGTABLE_PROT_NORMAL_NC:
+		return -EINVAL;
+	case KVM_PGTABLE_PROT_DEVICE:
+		attr = MT_S2_FWB_DEVICE_nGnRE;
+		break;
+	case KVM_PGTABLE_PROT_NORMAL_NC:
+		attr = MT_S2_FWB_NORMAL_NC;
+		break;
+	default:
+		attr = MT_S2_FWB_NORMAL;
+	}
+
+	flags |= FIELD_PREP(RMI_RTT_UNPROT_MAP_FLAGS_MEMATTR_MASK, attr);
+
+	if (prot & KVM_PGTABLE_PROT_R)
+		flags |= FIELD_PREP(RMI_RTT_UNPROT_MAP_FLAGS_S2AP_MASK, RMI_S2AP_DIRECT_READ);
+	if (prot & KVM_PGTABLE_PROT_W)
+		flags |= FIELD_PREP(RMI_RTT_UNPROT_MAP_FLAGS_S2AP_MASK, RMI_S2AP_DIRECT_WRITE);
+
+	/* TODO: Batch mappings with RMI_ADDR_TYPE_LIST. */
+	flags |= RMI_ADDR_TYPE_SINGLE;
+
+	while (ipa < ipa_top) {
+		unsigned long range_desc = addr_range_desc(ipa, phys, ipa_top - ipa,
+							   RMI_OP_MEM_UNDELEGATED);
+		unsigned long call_top = ipa + RMI_ADDR_RANGE_COUNT(range_desc) *
+			rmi_addr_block_size_to_bytes(RMI_ADDR_RANGE_BLOCK_SIZE(range_desc));
+		unsigned long out_top;
+
+		ret = rmi_rtt_unprot_map(rd, ipa, call_top, flags, range_desc,
+					 &out_top);
+		if (ret < 0)
+			return ret;
+
+		if (ret) {
+			/* Create missing RTTs and retry */
+			int level = RMI_RESULT_DATA_LEVEL(ret);
+			int req_level = KVM_PGTABLE_LAST_LEVEL -
+				RMI_ADDR_RANGE_BLOCK_SIZE(range_desc);
+
+			if (RMI_RESULT_STATUS(ret) != RMI_ERROR_RTT ||
+			    ++retries > KVM_PGTABLE_LAST_LEVEL + 2)
+				return -ENXIO;
+
+			/* Replace an existing mapping to update its permissions. */
+			if (level >= req_level) {
+				realm_unmap_shared_range(kvm, ipa, ipa_top, false);
+				continue;
+			}
+
+			ret = realm_create_rtt_levels(realm, ipa, level,
+						      req_level,
+						      memcache);
+			if (ret)
+				return ret;
+
+			continue;
+		}
+
+		/* Retry the fault after releasing mmu_lock to service the IRQ. */
+		if (out_top == ipa)
+			return -EAGAIN;
+		if (WARN_ON_ONCE(out_top < ipa || out_top > call_top))
+			return -ENXIO;
+
+		phys += out_top - ipa;
+		ipa = out_top;
+		retries = 0;
+	}
+
+	return 0;
+}
+
+int realm_map_ipa(struct kvm *kvm, phys_addr_t ipa,
+		  kvm_pfn_t pfn, unsigned long map_size,
+		  enum kvm_pgtable_prot prot,
+		  struct kvm_mmu_memory_cache *memcache)
+{
+	struct realm *realm = &kvm->arch.realm;
+
+	if (kvm_realm_state(kvm) != REALM_STATE_ACTIVE)
+		return -EBUSY;
+
+	ipa = ALIGN_DOWN(ipa, map_size);
+	if (!kvm_realm_is_private_address(realm, ipa)) {
+		return realm_map_unprotected(kvm, ipa, pfn, map_size, prot,
+					    memcache);
+	}
+
+	/* It's impossible to map protected pages read-only. */
+	if (WARN_ON(!(prot & KVM_PGTABLE_PROT_W)))
+		return -EFAULT;
+	return realm_map_protected(kvm, ipa, pfn, map_size, memcache);
+}
+
 void kvm_destroy_realm(struct kvm *kvm)
 {
 	struct realm *realm = &kvm->arch.realm;
