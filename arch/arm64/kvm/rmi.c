@@ -6,6 +6,7 @@
 #include <uapi/linux/psci.h>
 #include <linux/arm-rmi-cmds.h>
 #include <linux/kvm_host.h>
+#include <linux/overflow.h>
 
 #include <asm/daifflags.h>
 #include <asm/kvm_emulate.h>
@@ -707,6 +708,58 @@ void kvm_realm_unmap_range_filter(struct kvm *kvm, unsigned long start,
 		realm_unmap_private_range(kvm, start, end, may_block);
 }
 
+static int realm_data_map_init(struct kvm *kvm, unsigned long ipa,
+			       kvm_pfn_t dst_pfn, kvm_pfn_t src_pfn,
+			       unsigned long flags)
+{
+	struct realm *realm = &kvm->arch.realm;
+	phys_addr_t rd = virt_to_phys(realm->rd);
+	phys_addr_t dst_phys, src_phys;
+	long ret;
+
+	lockdep_assert_held(&kvm->slots_lock);
+	lockdep_assert_held(&kvm->arch.config_lock);
+
+	dst_phys = __pfn_to_phys(dst_pfn);
+	src_phys = __pfn_to_phys(src_pfn);
+
+	if (rmi_delegate_page(dst_phys))
+		return -ENXIO;
+
+retry:
+	ret = rmi_rtt_data_map_init(rd, dst_phys, ipa, src_phys, flags);
+	if (ret >= 0 && RMI_RESULT_STATUS(ret) == RMI_ERROR_RTT) {
+		/* Create missing RTTs and retry */
+		int level = RMI_RESULT_DATA_LEVEL(ret);
+
+		if (KVM_BUG_ON(level >= KVM_PGTABLE_LAST_LEVEL, kvm)) {
+			ret = -EIO;
+			goto out_undelegate;
+		}
+
+		ret = realm_create_rtt_levels(realm, ipa, level,
+					      level + 1, NULL);
+		if (!ret)
+			goto retry;
+	}
+
+out_undelegate:
+	if (ret)
+		KVM_BUG_ON(rmi_undelegate_page(dst_phys), kvm);
+
+	return ret <= 0 ? ret : -ENXIO;
+}
+
+static int populate_region_cb(struct kvm *kvm, gfn_t gfn, kvm_pfn_t pfn,
+			      struct page *src_page, void *opaque)
+{
+	unsigned long data_flags = *(unsigned long *)opaque;
+	phys_addr_t ipa = gfn_to_gpa(gfn);
+
+	return realm_data_map_init(kvm, ipa, pfn, page_to_pfn(src_page),
+				   data_flags);
+}
+
 static unsigned long addr_range_desc(unsigned long ipa, unsigned long phys,
 				     unsigned long size, unsigned long state)
 {
@@ -1394,6 +1447,64 @@ static int realm_ensure_created(struct kvm *kvm)
 	}
 
 	return realm_create_rd(kvm);
+}
+
+int kvm_arm_rmi_populate(struct kvm *kvm,
+			 struct kvm_arm_rmi_populate *args)
+{
+	unsigned long data_flags = 0;
+	unsigned long ipa_start = args->base;
+	unsigned long ipa_end = ipa_start + args->size;
+	long pages_populated;
+	int ret;
+
+	if (args->reserved ||
+	    (args->flags & ~KVM_ARM_RMI_POPULATE_FLAGS_MEASURE) ||
+	    args->base + args->size < args->base ||
+	    !IS_ALIGNED(ipa_start, PAGE_SIZE) ||
+	    !IS_ALIGNED(ipa_end, PAGE_SIZE) ||
+	    !IS_ALIGNED(args->source_uaddr, PAGE_SIZE) ||
+	    !args->source_uaddr)
+		return -EINVAL;
+
+	if (args->flags & KVM_ARM_RMI_POPULATE_FLAGS_MEASURE)
+		data_flags |= RMI_MEASURE_CONTENT;
+
+	mutex_lock(&kvm->slots_lock);
+	mutex_lock(&kvm->arch.config_lock);
+
+	ret = realm_ensure_created(kvm);
+	if (ret)
+		goto out_unlock;
+
+	if (range_overflows(args->base, args->size,
+			    BIT_ULL(kvm->arch.realm.ia_bits - 1))) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	if (args->size == 0)
+		goto out_unlock;
+
+	pages_populated = kvm_gmem_populate(kvm, gpa_to_gfn(ipa_start),
+					    u64_to_user_ptr(args->source_uaddr),
+					    args->size >> PAGE_SHIFT,
+					    false, populate_region_cb,
+					    &data_flags);
+
+	if (pages_populated < 0) {
+		ret = pages_populated;
+		goto out_unlock;
+	}
+
+	args->size -= pages_populated << PAGE_SHIFT;
+	args->source_uaddr += pages_populated << PAGE_SHIFT;
+	args->base += pages_populated << PAGE_SHIFT;
+
+out_unlock:
+	mutex_unlock(&kvm->arch.config_lock);
+	mutex_unlock(&kvm->slots_lock);
+	return ret;
 }
 
 static int kvm_create_rec(struct kvm_vcpu *vcpu)
