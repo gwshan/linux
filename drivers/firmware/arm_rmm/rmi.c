@@ -11,7 +11,6 @@
 #include <linux/slab.h>
 
 #include <asm/memory.h>
-#include <asm/pgtable-hwdef.h>
 
 /* RMM v2.0 defines RmiFeatureRegister0 to RmiFeatureRegister4. */
 static unsigned long rmi_feat_reg_cache[5] __ro_after_init;
@@ -182,15 +181,6 @@ int rmi_free_delegated_page(phys_addr_t phys)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(rmi_free_delegated_page);
-
-/*
- * Convert the RmiAddrBlockSize to actual size. This is used in RmiDonateReq
- * and RmiAddrRangeDesc*.
- */
-static unsigned long rmi_addr_block_size_to_bytes(unsigned long block_size_fld)
-{
-	return BIT(ARM64_HW_PGTABLE_LEVEL_SHIFT(3 - block_size_fld));
-}
 
 /*
  * free_addr_range: Free memory described by the address range entry, which may
