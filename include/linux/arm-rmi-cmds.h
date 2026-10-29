@@ -13,7 +13,15 @@
 #include <linux/string.h>
 #include <linux/types.h>
 
+#include <asm/pgtable-hwdef.h>
+
 #define RMI_MAX_ADDR_LIST	256
+
+/* Convert the block size used by RmiDonateReq and RmiAddrRangeDesc. */
+static inline unsigned long rmi_addr_block_size_to_bytes(unsigned long block_size)
+{
+	return BIT(ARM64_HW_PGTABLE_LEVEL_SHIFT(3 - block_size));
+}
 
 struct rmi_sro_state {
 	struct arm_smccc_1_2_regs regs;

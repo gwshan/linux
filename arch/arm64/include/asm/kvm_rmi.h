@@ -81,6 +81,14 @@ int kvm_init_realm(struct kvm *kvm);
 void kvm_destroy_realm(struct kvm *kvm);
 int kvm_realm_teardown_stage2(struct kvm *kvm);
 
+enum kvm_gfn_range_filter;
+
+void kvm_realm_unmap_range_filter(struct kvm *kvm,
+				  unsigned long ipa,
+				  unsigned long size,
+				  bool may_block,
+				  enum kvm_gfn_range_filter attr_filter);
+
 static inline bool kvm_realm_is_private_address(struct realm *realm,
 						unsigned long addr)
 {
