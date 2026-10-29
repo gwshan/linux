@@ -108,6 +108,11 @@ void kvm_destroy_realm(struct kvm *kvm);
 int kvm_realm_teardown_stage2(struct kvm *kvm);
 void kvm_destroy_rec(struct kvm_vcpu *vcpu);
 
+struct kvm_arm_rmi_populate;
+
+int kvm_arm_rmi_populate(struct kvm *kvm,
+			 struct kvm_arm_rmi_populate *arg);
+
 enum kvm_gfn_range_filter;
 
 void kvm_realm_unmap_range_filter(struct kvm *kvm,
