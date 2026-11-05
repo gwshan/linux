@@ -251,6 +251,7 @@ static unsigned int fill_balloon(struct virtio_balloon *vb, size_t num)
 
 	/* We can only do one array worth at a time. */
 	num = min(num, ARRAY_SIZE(vb->pfns));
+	pr_info("%s: num=%ld, ARRAY_SIZE(vb->pfns)=%ld\n", __func__, num, ARRAY_SIZE(vb->pfns));
 
 	for (num_pfns = 0; num_pfns < num;
 	     num_pfns += VIRTIO_BALLOON_PAGES_PER_PAGE) {
@@ -525,6 +526,8 @@ static void virtballoon_changed(struct virtio_device *vdev)
 	struct virtio_balloon *vb = vdev->priv;
 	unsigned long flags;
 
+	pr_info("%s: enter\n", __func__);
+
 	spin_lock_irqsave(&vb->stop_update_lock, flags);
 	if (!vb->stop_update) {
 		start_update_balloon_size(vb);
@@ -565,6 +568,7 @@ static void update_balloon_size_func(struct work_struct *work)
 	process_wakeup_event(vb, VIRTIO_BALLOON_WAKEUP_SIGNAL_ADJUST);
 
 	diff = towards_target(vb);
+	pr_info("%s: diff=%lld, vb->num_pages=%d\n", __func__, diff, vb->num_pages);
 
 	if (diff) {
 		if (diff > 0)
@@ -926,6 +930,10 @@ static int virtballoon_probe(struct virtio_device *vdev)
 {
 	struct virtio_balloon *vb;
 	int err;
+
+        pr_info("\n");
+	pr_info("=======================================================\n");
+	pr_info("\n");
 
 	if (!vdev->config->get) {
 		dev_err(&vdev->dev, "%s failure: config access disabled\n",
