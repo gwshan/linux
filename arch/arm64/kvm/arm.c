@@ -1833,8 +1833,16 @@ static unsigned long system_supported_vcpu_features(struct kvm_vcpu *vcpu)
 {
 	unsigned long features = KVM_VCPU_VALID_FEATURES;
 
-	if (vcpu->kvm->arch.vm_flavor == VM_PROTECTED_PKVM)
+	switch (vcpu->kvm->arch.vm_flavor) {
+	case VM_PROTECTED_PKVM:
 		kvm_pkvm_vcpu_allowed_features(vcpu->kvm, &features);
+		break;
+	case VM_REALM:
+		features = KVM_REALM_VCPU_VALID_FEATURES;
+		break;
+	default:
+		break;
+	}
 
 	if (!cpus_have_final_cap(ARM64_HAS_32BIT_EL1))
 		clear_bit(KVM_ARM_VCPU_EL1_32BIT, &features);
